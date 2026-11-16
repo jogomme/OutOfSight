@@ -5,7 +5,7 @@ import pico2d as canvas
 from pico2d import pico2d as sdl
 
 from .dialogue import wrap_text
-from .opening import DOORBELL, PHONE, WINDOW
+from .opening import DOORBELL, PHONE, PHONE_ITEM, WINDOW
 from .lighting import Lighting
 
 from .first_puzzle import DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
@@ -13,7 +13,7 @@ from .first_puzzle import DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
 
 ASSETS = Path(__file__).resolve().parent
 INK = (236, 222, 190)
-ITEM_LABELS = {'Guest register': '방문 기록부'}
+ITEM_LABELS = {'Guest register': '방문 기록부', PHONE_ITEM: '동생의 휴대전화'}
 ROOM_LABELS = {
     'hall': '별장 1층', 'dining': '연회 식당', 'kitchen': '준비 주방',
     'bath': '공용 욕실', 'guest': '귀빈실', 'upstairs': '별장 2층 · 갤러리',
@@ -84,8 +84,7 @@ class GameView:
                 canvas.draw_rectangle(402, 30, 470, 51, 49, 38, 28, filled=True)
                 canvas.draw_line(402, 51, 430, 70, 151, 105, 66)
             else:
-                canvas.draw_rectangle(402, 30, 470, 51, 112, 75, 49, filled=True)
-                canvas.draw_rectangle(454, 43, 460, 47, 237, 189, 108, filled=True)
+                self.draw_locked_entrance()
             if opening.blackout:
                 self.lighting.draw(opening.puzzle)
             elif opening.dialogue is None:
@@ -149,10 +148,16 @@ class GameView:
         if dialogue.complete:
             self.text(640, 31, 'Space 다음 ▸', 15)
 
+    @staticmethod
+    def draw_locked_entrance():
+        canvas.draw_rectangle(402, 30, 470, 51, 112, 75, 49, filled=True)
+        canvas.draw_rectangle(454, 43, 460, 47, 237, 189, 108, filled=True)
+
     def draw_play(self, scene):
         puzzle = scene.puzzle
         self.image(ASSETS / 'art' / f'{puzzle.room}.png').draw(400, 300, WIDTH, HEIGHT)
         if puzzle.room == 'hall':
+            self.draw_locked_entrance()
             color = (172, 201, 138) if puzzle.door_open else (176, 128, 78)
             canvas.draw_rectangle(*PLATE, *color)
             door_color = (97, 163, 112) if puzzle.door_open else (151, 71, 57)

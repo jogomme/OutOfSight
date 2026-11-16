@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from .first_puzzle import FirstPuzzle, HEIGHT, PATROLS, PORTALS, WIDTH
+from .opening import PHONE_ITEM
 
 
 def save_game(path, puzzle, show_hints):
@@ -77,9 +78,12 @@ def load_game(path):
     for key in ('solved', 'flashlight', 'show_hints'):
         if type(data[key]) is not bool:
             raise ValueError('Invalid save option')
-    if data['items'] not in ([], ['Guest register']):
+    items = data['items']
+    if (not isinstance(items, list)
+            or any(item not in ('Guest register', PHONE_ITEM) for item in items)
+            or len(set(items)) != len(items)):
         raise ValueError('Invalid inventory')
     puzzle.solved = data['solved']
     puzzle.flashlight = data['flashlight']
-    puzzle.items = data['items']
+    puzzle.items = items
     return puzzle, data['show_hints']

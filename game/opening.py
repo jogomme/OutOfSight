@@ -11,6 +11,7 @@ EXTERIOR_WALLS = (
 DOORBELL = (400, 270)
 WINDOW = (630, 270)
 PHONE = (470, 255)
+PHONE_ITEM = 'Sibling phone'
 CUES = {13: 'thunder', 14: 'door', 15: 'lock', 16: 'footsteps'}
 
 
@@ -80,6 +81,7 @@ class Opening:
             return
         if self.stage == 'phone':
             if self.near(self.puzzle.player, PHONE):
+                self.puzzle.items.append(PHONE_ITEM)
                 self.begin(12, 17)
             else:
                 self.message = '복도 바닥의 휴대전화를 찾아보자.'
