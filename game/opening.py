@@ -1,6 +1,6 @@
 from math import hypot
 
-from .dialogue import Dialogue, Line, load_script
+from .dialogue import Dialogue, load_script
 from .first_puzzle import Actor, HEIGHT, PLAYER_SPEED, WIDTH
 
 
@@ -12,10 +12,10 @@ DOORBELL = (400, 270)
 WINDOW = (630, 270)
 PHONE = (470, 255)
 PHONE_ITEM = 'Sibling phone'
-RING_LINES = (3, 8)
-RING_DURATION = 1.8
 THUNDER_DURATION = 0.30
-CUES = {13: 'thunder', 14: 'door', 15: 'lock', 16: 'footsteps'}
+THUNDER_LINE = 15
+DOOR_SLAM_LINE = 16
+CUES = {THUNDER_LINE: 'thunder', DOOR_SLAM_LINE: 'door', 17: 'lock', 18: 'footsteps'}
 
 
 class Opening:
@@ -28,7 +28,7 @@ class Opening:
         self.cue_remaining = 0.0
         self.cue_duration = 0.0
         self.sounds = []
-        self.begin(0, 6)
+        self.begin(0, 7)
 
     def begin(self, start, end):
         self.offset = start
@@ -43,9 +43,9 @@ class Opening:
         if self.index is not None:
             if self.index < 3:
                 return 'home'
-            if self.index < 5:
+            if self.index < 6:
                 return 'car'
-            if self.index == 10:
+            if self.index == 12:
                 return 'window'
         if self.stage == 'phone':
             return 'corridor'
@@ -53,21 +53,14 @@ class Opening:
 
     @property
     def changes_place(self):
-        return self.index in (2, 4, 10, 11)
-
-    def ringing_dialogue(self):
-        text = '뚜르르…' if self.cue_remaining > RING_DURATION / 2 else '뚜르르… 뚜르르…'
-        dialogue = Dialogue([Line(self.background, '전화 연결음', '효과음', text)])
-        dialogue.advance()
-        return dialogue
+        return self.index in (2, 5, 12, 13)
 
     def start_cue(self):
-        if self.index in RING_LINES:
+        if self.dialogue.line.speaker == '전화 연결음':
             self.sounds.append('ring')
-            self.cue_remaining = self.cue_duration = RING_DURATION
         elif self.index in CUES:
             self.sounds.append(CUES[self.index])
-            if self.index == 13:
+            if self.index == THUNDER_LINE:
                 self.cue_remaining = self.cue_duration = THUNDER_DURATION
 
     def advance(self):
@@ -90,7 +83,7 @@ class Opening:
     def update(self, dt, horizontal=0, vertical=0, turn_only=False):
         if self.cue_remaining > 0:
             self.cue_remaining = max(0, self.cue_remaining - dt)
-            if self.index == 13 and self.cue_remaining == 0:
+            if self.index == THUNDER_LINE and self.cue_remaining == 0:
                 self.blackout = True
             return
         if self.dialogue:
@@ -108,20 +101,20 @@ class Opening:
         if self.stage == 'phone':
             if self.near(self.puzzle.player, PHONE):
                 self.puzzle.items.append(PHONE_ITEM)
-                self.begin(12, 17)
+                self.begin(14, 19)
             else:
                 return '복도 바닥의 휴대전화를 찾아보자.'
             return
         if self.stage == 'bell' and self.near(self.exterior, DOORBELL):
             self.stage = 'bell_talk'
             self.sounds.append('bell')
-            self.begin(6, 10)
+            self.begin(7, 12)
         elif self.stage == 'window' and self.near(self.exterior, WINDOW):
             self.stage = 'window_talk'
-            self.begin(10, 11)
+            self.begin(12, 13)
         elif self.stage == 'door' and self.near(self.exterior, DOORBELL):
             self.stage = 'door_talk'
-            self.begin(11, 12)
+            self.begin(13, 14)
         else:
             return '옆쪽 창문을 살펴보자.' if self.stage == 'window' else '근처에 조사할 건 없는 것 같아.'
 

@@ -8,6 +8,7 @@ CHARACTERS_PER_SECOND = 32
 SPEAKERS = {
     '동생 (어제 보낸 문자)': '동생 · 문자',
     '자동 안내 음성': '자동 안내 음성',
+    '전화 연결음': '전화 연결음',
     '주인공': '주인공',
 }
 HEADER = re.compile(r'^\*\*(대화|생각) · (.+?)\*\*\s*$', re.MULTILINE)

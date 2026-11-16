@@ -6,7 +6,7 @@ import pico2d as canvas
 from pico2d import pico2d as sdl
 
 from .dialogue import wrap_text
-from .opening import DOORBELL, PHONE, PHONE_ITEM, RING_LINES, WINDOW
+from .opening import DOORBELL, DOOR_SLAM_LINE, PHONE, PHONE_ITEM, THUNDER_LINE, WINDOW
 from .lighting import Lighting
 
 from .first_puzzle import COMMON_WALLS, DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
@@ -92,14 +92,14 @@ class GameView:
 
         background = opening.background
         if background == 'corridor':
-            thunder = opening.index == 13 and opening.cue_remaining > 0
+            thunder = opening.index == THUNDER_LINE and opening.cue_remaining > 0
             if thunder:
                 progress = 1 - opening.cue_remaining / opening.cue_duration
                 offset = round(7 * sin(tau * progress) * (1 - progress))
                 viewport = sdl.SDL_Rect(offset, 0, WIDTH, HEIGHT)
                 sdl.SDL_RenderSetViewport(sdl.renderer, byref(viewport))
             self.draw_hall()
-            if opening.index is None or opening.index < 14:
+            if opening.index is None or opening.index < DOOR_SLAM_LINE:
                 canvas.draw_rectangle(402, 30, 470, 51, 49, 38, 28, filled=True)
                 canvas.draw_line(402, 51, 430, 70, 151, 105, 66)
             else:
@@ -123,9 +123,7 @@ class GameView:
                 if opening.dialogue is None:
                     target = WINDOW if opening.stage == 'window' else DOORBELL
                     self.draw_sparkle(target, opening.exterior.animation_time)
-        if opening.cue_remaining and opening.index in RING_LINES:
-            self.draw_dialogue(opening.ringing_dialogue(), show_continue=False)
-        elif opening.dialogue is None:
+        if opening.dialogue is None:
             self.text(22, 576, 'WASD 이동   E 조사', 16)
         elif not opening.cue_remaining:
             self.draw_dialogue(opening.dialogue)
@@ -144,7 +142,7 @@ class GameView:
             canvas.draw_line(cx, cy - radius, cx, cy + radius, *color)
             canvas.draw_rectangle(cx - 1, cy - 1, cx + 1, cy + 1, *color, filled=True)
 
-    def draw_dialogue(self, dialogue, show_continue=True):
+    def draw_dialogue(self, dialogue):
         line = dialogue.line
         canvas.draw_rectangle(23, 15, 777, 166, 18, 21, 27, filled=True)
         canvas.draw_rectangle(23, 15, 777, 166, 165, 130, 92)
@@ -178,7 +176,7 @@ class GameView:
             if visible:
                 self.text(185, 108 - index * (size + 5), visible, size)
             remaining -= len(row)
-        if dialogue.complete and show_continue:
+        if dialogue.complete:
             self.text(640, 31, '클릭 / Space ▸', 15)
 
     @staticmethod
