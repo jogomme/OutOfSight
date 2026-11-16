@@ -16,11 +16,20 @@ from game.view import GameView, SKIP_BUTTON
 
 FADE_TIME = 0.22
 BLACK_HOLD = 0.12
+AUTOSAVE_INTERVAL = 60.0
 
 
 class LodgeScene:
     def __init__(self, save_path):
-        self.save_path = save_path
+        self.slot_paths = (
+            save_path,
+            save_path.with_stem(f'{save_path.stem}_2'),
+            save_path.with_stem(f'{save_path.stem}_3'),
+        )
+        self.active_slot = None
+        self.pending_slot = None
+        self.slot_mode = 'new'
+        self.autosave_elapsed = 0.0
         self.puzzle = FirstPuzzle()
         self.screen = 'title'
         self.settings_parent = 'title'
@@ -39,9 +48,33 @@ class LodgeScene:
         self.thought = None
 
     def start(self):
+        self.autosave_elapsed = 0.0
         self.puzzle = FirstPuzzle()
         self.opening = Opening(self.puzzle)
         self.set_screen('opening')
+
+    @property
+    def save_path(self):
+        return self.slot_paths[self.active_slot] if self.active_slot is not None else None
+
+    def choose_slots(self, mode):
+        self.slot_mode = mode
+        self.set_screen('slots')
+
+    def select_slot(self, index):
+        if self.slot_mode == 'new':
+            if self.slot_paths[index].is_file():
+                self.pending_slot = index
+                self.set_screen('confirm_slot')
+                self.message = '이 슬롯은 다음 저장 시 새 진행으로 덮어씁니다.'
+            else:
+                self.start_in_slot(index)
+        else:
+            self.load_slot(index)
+
+    def start_in_slot(self, index):
+        self.active_slot = index
+        self.start()
 
     def transition(self, action):
         self.fade_elapsed = 0.0
@@ -96,26 +129,37 @@ class LodgeScene:
                 self.show_thought(message)
 
     def restart_puzzle(self):
+        self.autosave_elapsed = 0.0
         self.puzzle = FirstPuzzle()
         self.opening = None
         self.set_screen('play')
 
-    def save(self):
+    def save(self, automatic=False):
+        path = self.save_path
+        if path is None or self.screen not in ('play', 'pause') or self.puzzle.caught:
+            return
+        self.autosave_elapsed = 0.0
         try:
-            save_game(self.save_path, self.puzzle, self.show_hints)
+            save_game(path, self.puzzle, self.show_hints)
         except OSError:
             self.message = '저장하지 못했습니다. 저장 폴더의 쓰기 권한을 확인해 주세요.'
         else:
-            self.message = '진행 상황을 저장했습니다.'
+            self.message = '자동 저장했습니다.' if automatic else '진행 상황을 저장했습니다.'
 
     def load(self):
+        if self.active_slot is not None:
+            self.load_slot(self.active_slot)
+
+    def load_slot(self, index):
         try:
-            puzzle, hints = load_game(self.save_path)
+            puzzle, hints = load_game(self.slot_paths[index])
         except FileNotFoundError:
             self.message = '저장된 게임이 없습니다.'
         except (OSError, ValueError, TypeError, KeyError, OverflowError):
             self.message = '저장된 게임을 읽을 수 없습니다.'
         else:
+            self.active_slot = index
+            self.autosave_elapsed = 0.0
             self.puzzle = puzzle
             self.show_hints = hints
             self.set_screen('play')
@@ -129,7 +173,11 @@ class LodgeScene:
         self.show_hints = not self.show_hints
 
     def back(self):
-        if self.screen == 'settings':
+        if self.screen == 'slots':
+            self.set_screen('title')
+        elif self.screen == 'confirm_slot':
+            self.set_screen('slots')
+        elif self.screen == 'settings':
             self.set_screen(self.settings_parent)
         elif self.screen in ('pause', 'inventory'):
             self.set_screen('play')
@@ -138,7 +186,17 @@ class LodgeScene:
 
     def buttons(self):
         if self.screen == 'title':
-            actions = [('새 게임', self.start), ('이어하기', self.load), ('설정', self.settings)]
+            actions = [('새 게임', lambda: self.choose_slots('new')),
+                       ('이어하기', lambda: self.choose_slots('load')), ('설정', self.settings)]
+        elif self.screen == 'slots':
+            actions = [
+                (f"{index + 1}번 슬롯 · {'저장 있음' if path.is_file() else '비어 있음'}",
+                 lambda index=index: self.select_slot(index))
+                for index, path in enumerate(self.slot_paths)
+            ]
+            actions.append(('뒤로', self.back))
+        elif self.screen == 'confirm_slot':
+            actions = [('이 슬롯으로 시작', lambda: self.start_in_slot(self.pending_slot)), ('뒤로', self.back)]
         elif self.screen == 'game_over':
             actions = [('이어하기', self.load), ('타이틀로 돌아가기', lambda: self.set_screen('title'))]
         elif self.screen == 'pause':
@@ -189,7 +247,7 @@ class LodgeScene:
         if event.key == canvas.SDLK_ESCAPE:
             self.back()
         elif self.screen == 'title' and event.key == canvas.SDLK_RETURN:
-            self.start()
+            self.choose_slots('new')
         elif event.key == canvas.SDLK_TAB and self.screen in ('play', 'inventory'):
             self.set_screen('inventory' if self.screen == 'play' else 'play')
         elif self.screen == 'play':
@@ -231,6 +289,10 @@ class LodgeScene:
         self.puzzle.update(horizontal, vertical, turn_only, dt, self.transition_room)
         if self.puzzle.caught:
             self.set_screen('game_over')
+            return
+        self.autosave_elapsed += dt
+        if self.fade_elapsed is None and self.autosave_elapsed >= AUTOSAVE_INTERVAL:
+            self.save(automatic=True)
 
     def transition_room(self, enter):
         def switch():

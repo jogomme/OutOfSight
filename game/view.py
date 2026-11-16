@@ -56,11 +56,14 @@ class GameView:
             self.draw_play(scene)
             return
 
-        backdrop = 'settings' if scene.screen == 'pause' else scene.screen
+        backdrop = {
+            'pause': 'settings', 'slots': 'title', 'confirm_slot': 'title',
+        }.get(scene.screen, scene.screen)
         self.image(ASSETS / 'art' / f'{backdrop}.png').draw(400, 300, WIDTH, HEIGHT)
         title = {
             'title': 'OUT OF SIGHT', 'pause': '일시 정지',
             'inventory': '소지품', 'settings': '설정', 'game_over': 'GAME OVER',
+            'slots': '저장 슬롯 선택', 'confirm_slot': '저장 슬롯 확인',
         }[scene.screen]
         if scene.screen == 'game_over':
             self.text(267, 350, title, 54)
@@ -121,10 +124,10 @@ class GameView:
                     self.draw_sparkle(target, opening.exterior.animation_time)
         if opening.cue_remaining and opening.index in RING_LINES:
             self.text(42, 102, '뚜르르… 뚜르르…', 22)
-        elif opening.dialogue and not opening.cue_remaining:
-            self.draw_dialogue(opening.dialogue)
-        else:
+        elif opening.dialogue is None:
             self.text(22, 576, 'WASD 이동   E 조사', 16)
+        elif not opening.cue_remaining:
+            self.draw_dialogue(opening.dialogue)
 
     @staticmethod
     def draw_sparkle(point, elapsed):
