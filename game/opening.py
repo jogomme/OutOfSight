@@ -1,6 +1,6 @@
 from math import hypot
 
-from .dialogue import Dialogue, load_script
+from .dialogue import Dialogue, Line, load_script
 from .first_puzzle import Actor, HEIGHT, PLAYER_SPEED, WIDTH
 
 
@@ -50,6 +50,16 @@ class Opening:
         if self.stage == 'phone':
             return 'corridor'
         return 'outside'
+
+    @property
+    def changes_place(self):
+        return self.index in (2, 4, 10, 11)
+
+    def ringing_dialogue(self):
+        text = '뚜르르…' if self.cue_remaining > RING_DURATION / 2 else '뚜르르… 뚜르르…'
+        dialogue = Dialogue([Line(self.background, '전화 연결음', '효과음', text)])
+        dialogue.advance()
+        return dialogue
 
     def start_cue(self):
         if self.index in RING_LINES:

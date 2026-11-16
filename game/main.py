@@ -9,7 +9,7 @@ if not __package__:
 from game.dialogue import Dialogue, Line
 from game.first_puzzle import HEIGHT, WIDTH, FirstPuzzle, contains
 from game.framework import run
-from game.opening import Opening, PHONE, PHONE_ITEM, WINDOW
+from game.opening import Opening, WINDOW
 from game.persistence import load_game, save_game
 from game.view import GameView, SKIP_BUTTON
 
@@ -95,10 +95,14 @@ class LodgeScene:
         self.skip_update = True
 
     def skip_opening(self):
-        if PHONE_ITEM not in self.puzzle.items:
-            self.puzzle.items.append(PHONE_ITEM)
-        self.puzzle.player.x, self.puzzle.player.y = PHONE
-        self.finish_opening()
+        opening = self.opening
+        while opening.dialogue and not opening.cue_remaining:
+            dialogue = opening.dialogue
+            dialogue.characters = len(dialogue.line.text)
+            if opening.changes_place or dialogue.index == len(dialogue.lines) - 1:
+                self.advance_dialogue()
+                return
+            self.advance_opening()
 
     def advance_dialogue(self):
         if self.thought:
@@ -108,7 +112,7 @@ class LodgeScene:
             return
         if self.screen != 'opening' or self.opening.dialogue is None:
             return
-        if self.opening.dialogue.complete and self.opening.index in (2, 4, 10, 11):
+        if self.opening.dialogue.complete and self.opening.changes_place:
             self.transition(self.advance_opening)
         else:
             self.advance_opening()
@@ -227,7 +231,7 @@ class LodgeScene:
         if event.type == canvas.SDL_MOUSEBUTTONDOWN and event.button == canvas.SDL_BUTTON_LEFT:
             x, y = event.x, HEIGHT - 1 - event.y
             if self.screen == 'opening' and contains(SKIP_BUTTON, x, y):
-                self.transition(self.skip_opening)
+                self.skip_opening()
             elif self.thought or self.screen == 'opening':
                 self.advance_dialogue()
             else:

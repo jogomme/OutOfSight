@@ -15,7 +15,7 @@ from .first_puzzle import COMMON_WALLS, DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDT
 ASSETS = Path(__file__).resolve().parent
 INK = (236, 222, 190)
 SKIP_BUTTON = (666, 546, 780, 581)
-PORTRAITS = {'동생 · 문자': 'sibling', '자동 안내 음성': 'voicemail'}
+PORTRAITS = {'동생 · 문자': 'sibling', '자동 안내 음성': 'voicemail', '전화 연결음': 'voicemail'}
 ITEM_LABELS = {'Guest register': '방문 기록부', PHONE_ITEM: '동생의 휴대전화'}
 ROOM_LABELS = {
     'hall': '별장 1층', 'dining': '연회 식당', 'kitchen': '준비 주방',
@@ -48,9 +48,10 @@ class GameView:
     def draw(self, scene):
         if scene.screen == 'opening':
             self.draw_opening(scene.opening)
-            canvas.draw_rectangle(*SKIP_BUTTON, 22, 25, 31, filled=True)
-            canvas.draw_rectangle(*SKIP_BUTTON, 165, 130, 92)
-            self.text(682, 564, '건너뛰기', 17)
+            if scene.opening.dialogue and not scene.opening.cue_remaining:
+                canvas.draw_rectangle(*SKIP_BUTTON, 22, 25, 31, filled=True)
+                canvas.draw_rectangle(*SKIP_BUTTON, 165, 130, 92)
+                self.text(682, 564, '건너뛰기', 17)
             return
         if scene.screen == 'play':
             self.draw_play(scene)
@@ -123,7 +124,7 @@ class GameView:
                     target = WINDOW if opening.stage == 'window' else DOORBELL
                     self.draw_sparkle(target, opening.exterior.animation_time)
         if opening.cue_remaining and opening.index in RING_LINES:
-            self.text(42, 102, '뚜르르… 뚜르르…', 22)
+            self.draw_dialogue(opening.ringing_dialogue(), show_continue=False)
         elif opening.dialogue is None:
             self.text(22, 576, 'WASD 이동   E 조사', 16)
         elif not opening.cue_remaining:
@@ -143,7 +144,7 @@ class GameView:
             canvas.draw_line(cx, cy - radius, cx, cy + radius, *color)
             canvas.draw_rectangle(cx - 1, cy - 1, cx + 1, cy + 1, *color, filled=True)
 
-    def draw_dialogue(self, dialogue):
+    def draw_dialogue(self, dialogue, show_continue=True):
         line = dialogue.line
         canvas.draw_rectangle(23, 15, 777, 166, 18, 21, 27, filled=True)
         canvas.draw_rectangle(23, 15, 777, 166, 165, 130, 92)
@@ -177,7 +178,7 @@ class GameView:
             if visible:
                 self.text(185, 108 - index * (size + 5), visible, size)
             remaining -= len(row)
-        if dialogue.complete:
+        if dialogue.complete and show_continue:
             self.text(640, 31, '클릭 / Space ▸', 15)
 
     @staticmethod
