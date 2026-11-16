@@ -23,13 +23,11 @@ class Opening:
         self.stage = 'arrival'
         self.blackout = False
         self.sounds = []
-        self.message = ''
         self.begin(0, 6)
 
     def begin(self, start, end):
         self.offset = start
         self.dialogue = Dialogue(self.lines[start:end])
-        self.message = ''
 
     @property
     def index(self):
@@ -84,7 +82,7 @@ class Opening:
                 self.puzzle.items.append(PHONE_ITEM)
                 self.begin(12, 17)
             else:
-                self.message = '복도 바닥의 휴대전화를 찾아보자.'
+                return '복도 바닥의 휴대전화를 찾아보자.'
             return
         if self.stage == 'bell' and self.near(self.exterior, DOORBELL):
             self.stage = 'bell_talk'
@@ -97,7 +95,7 @@ class Opening:
             self.stage = 'door_talk'
             self.begin(11, 12)
         else:
-            self.message = '옆쪽 창문을 살펴보자.' if self.stage == 'window' else '현관 앞에서 조사해 보자.'
+            return '옆쪽 창문을 살펴보자.' if self.stage == 'window' else '근처에 조사할 건 없는 것 같아.'
 
     @staticmethod
     def near(actor, point):

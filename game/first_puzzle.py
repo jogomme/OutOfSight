@@ -210,22 +210,28 @@ class FirstPuzzle:
             return '발판이 눌려 있어 문이 열려 있습니다.' if self.door_open else '문이 잠겨 있습니다. 감시자가 발판을 누르면 열릴 것 같습니다.'
         if self.room == 'hall' and hypot(x - 536, y - 330) <= 62:
             return '감시자가 발판에 올라가면 작동합니다.'
-        return '근처에 조사할 것이 없습니다.'
+        return '근처에 조사할 건 없는 것 같아.'
 
-    def update(self, horizontal, vertical, turn_only, dt):
+    def update(self, horizontal, vertical, turn_only, dt, transition=None):
         self.player.move(horizontal, vertical, 0 if turn_only else PLAYER_SPEED * dt, self.walls)
 
         self.player.animation_time += dt
         for trigger, room, arrival, _ in self.exits(self.room):
             if contains(trigger, self.player.x, self.player.y):
-                self.room = room
-                self.player.x, self.player.y = arrival
-                self.solved |= room == 'guest'
-                self.activate_room()
+                if transition is not None:
+                    transition(lambda: self.enter_room(room, arrival))
+                    return
+                self.enter_room(room, arrival)
                 break
 
         for index, watcher in enumerate(self.watchers):
             self.update_watcher(watcher, PATROLS[index], dt)
+
+    def enter_room(self, room, arrival):
+        self.room = room
+        self.player.x, self.player.y = arrival
+        self.solved |= room == 'guest'
+        self.activate_room()
 
     def route_to(self, watcher, room, target):
         origin = (watcher.x, watcher.y)

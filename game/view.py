@@ -14,6 +14,8 @@ from .first_puzzle import DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
 
 ASSETS = Path(__file__).resolve().parent
 INK = (236, 222, 190)
+SKIP_BUTTON = (666, 546, 780, 581)
+PORTRAITS = {'동생 · 문자': 'sibling', '자동 안내 음성': 'voicemail'}
 ITEM_LABELS = {'Guest register': '방문 기록부', PHONE_ITEM: '동생의 휴대전화'}
 ROOM_LABELS = {
     'hall': '별장 1층', 'dining': '연회 식당', 'kitchen': '준비 주방',
@@ -46,6 +48,9 @@ class GameView:
     def draw(self, scene):
         if scene.screen == 'opening':
             self.draw_opening(scene.opening)
+            canvas.draw_rectangle(*SKIP_BUTTON, 22, 25, 31, filled=True)
+            canvas.draw_rectangle(*SKIP_BUTTON, 165, 130, 92)
+            self.text(682, 564, '건너뛰기', 17)
             return
         if scene.screen == 'play':
             self.draw_play(scene)
@@ -105,21 +110,17 @@ class GameView:
             self.draw_dialogue(opening.dialogue)
         else:
             self.text(22, 576, 'WASD 이동   E 조사', 16)
-            if opening.message:
-                canvas.draw_rectangle(0, 0, WIDTH, 36, 17, 19, 23, filled=True)
-                self.text(22, 18, opening.message, 16)
 
     @staticmethod
     def draw_sparkle(point, elapsed):
         x, y = point
         for dx, dy, offset, scale in ((0, 13, 0.0, 1.0), (9, 21, 0.24, 0.55)):
             phase = (elapsed / 1.4 + offset) % 1
-            pulse = ((1 + cos(tau * phase)) * 0.5) ** 3
-            if pulse < 0.06:
-                continue
-            radius = max(1, round((2 + 4 * pulse) * scale))
-            color = (round(168 + 87 * pulse), round(122 + 105 * pulse), round(63 + 118 * pulse))
+            pulse = (1 + cos(tau * phase)) * 0.5
+            radius = max(2, round((5 + 6 * pulse) * scale))
+            color = (255, round(188 + 52 * pulse), round(91 + 120 * pulse))
             cx, cy = x + dx, y + dy
+            canvas.draw_rectangle(cx - 3, cy - 3, cx + 3, cy + 3, 83, 53, 28, filled=True)
             canvas.draw_line(cx - radius, cy, cx + radius, cy, *color)
             canvas.draw_line(cx, cy - radius, cx, cy + radius, *color)
             canvas.draw_rectangle(cx - 1, cy - 1, cx + 1, cy + 1, *color, filled=True)
@@ -128,8 +129,11 @@ class GameView:
         line = dialogue.line
         canvas.draw_rectangle(23, 15, 777, 166, 18, 21, 27, filled=True)
         canvas.draw_rectangle(23, 15, 777, 166, 165, 130, 92)
-        canvas.draw_line(42, 126, 756, 126, 108, 85, 62)
-        self.text(42, 145, line.speaker, 19)
+        canvas.draw_line(185, 126, 756, 126, 108, 85, 62)
+        portrait = PORTRAITS.get(line.speaker, 'hero')
+        self.image(ASSETS / 'art' / 'opening' / f'{portrait}.png').draw(103, 127, 142, 142)
+        canvas.draw_rectangle(30, 54, 176, 200, 165, 130, 92)
+        self.text(185, 145, line.speaker, 19)
 
         size = 22
         if self.dialogue_layout is None or self.dialogue_layout[0] != line:
@@ -139,11 +143,11 @@ class GameView:
                 sdl.TTF_SizeUTF8(self.fonts[size].font, text.encode('utf-8'), byref(width), byref(height))
                 return width.value
 
-            rows = wrap_text(line.text, measure, 710)
+            rows = wrap_text(line.text, measure, 565)
             while len(rows) > 3 and size > 10:
                 size -= 1
                 self.font(size)
-                rows = wrap_text(line.text, measure, 710)
+                rows = wrap_text(line.text, measure, 565)
             self.dialogue_layout = (line, size, rows)
 
         _, size, rows = self.dialogue_layout
@@ -153,10 +157,16 @@ class GameView:
                 break
             visible = row[:remaining].rstrip()
             if visible:
-                self.text(42, 108 - index * (size + 5), visible, size)
+                self.text(185, 108 - index * (size + 5), visible, size)
             remaining -= len(row)
         if dialogue.complete:
-            self.text(640, 31, 'Space 다음 ▸', 15)
+            self.text(640, 31, '클릭 / Space ▸', 15)
+
+    @staticmethod
+    def draw_fade(alpha):
+        sdl.SDL_SetRenderDrawBlendMode(sdl.renderer, sdl.SDL_BLENDMODE_BLEND)
+        canvas.draw_rectangle(0, 0, WIDTH, HEIGHT, 0, 0, 0, alpha, filled=True)
+        sdl.SDL_SetRenderDrawBlendMode(sdl.renderer, sdl.SDL_BLENDMODE_NONE)
 
     @staticmethod
     def draw_locked_entrance():
