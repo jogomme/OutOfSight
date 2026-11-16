@@ -65,8 +65,8 @@ class Dialogue:
 
 def wrap_text(text, measure, max_width):
     rows = []
-    for paragraph in text.split('\n'):
-        remaining = paragraph
+    for paragraph in text.splitlines(keepends=True):
+        remaining = paragraph.rstrip('\r\n')
         while remaining and measure(remaining) > max_width:
             end = 1
             while end < len(remaining) and measure(remaining[:end + 1]) <= max_width:
@@ -79,5 +79,5 @@ def wrap_text(text, measure, max_width):
                 # Keep the space in the character count without drawing it.
                 rows[-1] += ' '
                 remaining = remaining[1:]
-        rows.append(remaining)
+        rows.append(remaining + paragraph[len(paragraph.rstrip('\r\n')):])
     return rows

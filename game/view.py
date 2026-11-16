@@ -72,25 +72,30 @@ class GameView:
         folder = ASSETS / 'art' / 'opening'
         for cue in opening.sounds:
             sound = folder / f'{cue}.wav'
-            if sound.is_file():
-                if cue not in self.sounds:
-                    self.sounds[cue] = canvas.load_wav(str(sound))
-                self.sounds[cue].play()
+            if cue not in self.sounds:
+                self.sounds[cue] = canvas.load_wav(str(sound))
+            self.sounds[cue].play()
         opening.sounds.clear()
 
         background = opening.background
         if background == 'corridor':
             self.image(ASSETS / 'art' / 'hall.png').draw(400, 300, WIDTH, HEIGHT)
+            if opening.index is None or opening.index < 14:
+                canvas.draw_rectangle(402, 30, 470, 51, 49, 38, 28, filled=True)
+                canvas.draw_line(402, 51, 430, 70, 151, 105, 66)
+            else:
+                canvas.draw_rectangle(402, 30, 470, 51, 112, 75, 49, filled=True)
+                canvas.draw_rectangle(454, 43, 460, 47, 237, 189, 108, filled=True)
             if opening.blackout:
                 self.lighting.draw(opening.puzzle)
-                canvas.draw_rectangle(402, 40, 470, 51, 82, 57, 42, filled=True)
-                canvas.draw_rectangle(454, 43, 460, 47, 200, 160, 94, filled=True)
             elif opening.dialogue is None:
-                self.marker(PHONE, '휴대전화 [E]')
+                canvas.draw_rectangle(464, 249, 476, 261, 38, 42, 51, filled=True)
+                canvas.draw_rectangle(466, 251, 474, 259, 139, 180, 189, filled=True)
+                self.text(446, 235, '휴대전화 [E]', 16)
             self.draw_actor(opening.puzzle.player, 'protagonist', 56)
         else:
             path = folder / f'{background}.png'
-            self.image(path if path.is_file() else ASSETS / 'art' / 'title.png').draw(400, 300, WIDTH, HEIGHT)
+            self.image(path).draw(400, 300, WIDTH, HEIGHT)
             if background == 'outside':
                 self.draw_actor(opening.exterior, 'protagonist', 56)
                 if opening.dialogue is None:
@@ -140,7 +145,7 @@ class GameView:
             visible = row[:remaining].rstrip()
             if visible:
                 self.text(42, 108 - index * (size + 5), visible, size)
-            remaining -= len(row) + 1 if '\n' in line.text and not row.endswith(' ') else len(row)
+            remaining -= len(row)
         if dialogue.complete:
             self.text(640, 31, 'Space 다음 ▸', 15)
 
