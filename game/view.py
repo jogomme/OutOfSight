@@ -1,12 +1,12 @@
 from ctypes import byref, c_int
-from math import cos, tau
+from math import cos, sin, tau
 from pathlib import Path
 
 import pico2d as canvas
 from pico2d import pico2d as sdl
 
 from .dialogue import wrap_text
-from .opening import DOORBELL, PHONE, PHONE_ITEM, WINDOW
+from .opening import DOORBELL, PHONE, PHONE_ITEM, RING_LINES, WINDOW
 from .lighting import Lighting
 
 from .first_puzzle import DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
@@ -85,6 +85,12 @@ class GameView:
 
         background = opening.background
         if background == 'corridor':
+            thunder = opening.index == 13 and opening.cue_remaining > 0
+            if thunder:
+                progress = 1 - opening.cue_remaining / opening.cue_duration
+                offset = round(7 * sin(tau * progress) * (1 - progress))
+                viewport = sdl.SDL_Rect(offset, 0, WIDTH, HEIGHT)
+                sdl.SDL_RenderSetViewport(sdl.renderer, byref(viewport))
             self.image(ASSETS / 'art' / 'hall.png').draw(400, 300, WIDTH, HEIGHT)
             if opening.index is None or opening.index < 14:
                 canvas.draw_rectangle(402, 30, 470, 51, 49, 38, 28, filled=True)
@@ -98,6 +104,10 @@ class GameView:
                 canvas.draw_rectangle(466, 251, 474, 259, 139, 180, 189, filled=True)
                 self.draw_sparkle(PHONE, opening.puzzle.player.animation_time)
             self.draw_actor(opening.puzzle.player, 'protagonist', 56)
+            if thunder:
+                sdl.SDL_RenderSetViewport(sdl.renderer, None)
+                flash = round(235 * max(0, 1 - progress / 0.42))
+                self.draw_fade(flash, (255, 255, 255))
         else:
             path = folder / f'{background}.png'
             self.image(path).draw(400, 300, WIDTH, HEIGHT)
@@ -106,7 +116,9 @@ class GameView:
                 if opening.dialogue is None:
                     target = WINDOW if opening.stage == 'window' else DOORBELL
                     self.draw_sparkle(target, opening.exterior.animation_time)
-        if opening.dialogue:
+        if opening.cue_remaining and opening.index in RING_LINES:
+            self.text(42, 102, '뚜르르… 뚜르르…', 22)
+        elif opening.dialogue and not opening.cue_remaining:
             self.draw_dialogue(opening.dialogue)
         else:
             self.text(22, 576, 'WASD 이동   E 조사', 16)
@@ -163,9 +175,9 @@ class GameView:
             self.text(640, 31, '클릭 / Space ▸', 15)
 
     @staticmethod
-    def draw_fade(alpha):
+    def draw_fade(alpha, color=(0, 0, 0)):
         sdl.SDL_SetRenderDrawBlendMode(sdl.renderer, sdl.SDL_BLENDMODE_BLEND)
-        canvas.draw_rectangle(0, 0, WIDTH, HEIGHT, 0, 0, 0, alpha, filled=True)
+        canvas.draw_rectangle(0, 0, WIDTH, HEIGHT, *color, alpha, filled=True)
         sdl.SDL_SetRenderDrawBlendMode(sdl.renderer, sdl.SDL_BLENDMODE_NONE)
 
     @staticmethod

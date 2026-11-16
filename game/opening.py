@@ -12,6 +12,9 @@ DOORBELL = (400, 270)
 WINDOW = (630, 270)
 PHONE = (470, 255)
 PHONE_ITEM = 'Sibling phone'
+RING_LINES = (3, 8)
+RING_DURATION = 1.8
+THUNDER_DURATION = 0.30
 CUES = {13: 'thunder', 14: 'door', 15: 'lock', 16: 'footsteps'}
 
 
@@ -22,6 +25,8 @@ class Opening:
         self.exterior = Actor(400, 75, 12, (0, 1))
         self.stage = 'arrival'
         self.blackout = False
+        self.cue_remaining = 0.0
+        self.cue_duration = 0.0
         self.sounds = []
         self.begin(0, 6)
 
@@ -46,14 +51,22 @@ class Opening:
             return 'corridor'
         return 'outside'
 
+    def start_cue(self):
+        if self.index in RING_LINES:
+            self.sounds.append('ring')
+            self.cue_remaining = self.cue_duration = RING_DURATION
+        elif self.index in CUES:
+            self.sounds.append(CUES[self.index])
+            if self.index == 13:
+                self.cue_remaining = self.cue_duration = THUNDER_DURATION
+
     def advance(self):
-        if self.dialogue is None:
+        if self.dialogue is None or self.cue_remaining > 0:
             return False
         previous = self.index
         if not self.dialogue.advance():
-            if previous != self.index and self.index in CUES:
-                self.sounds.append(CUES[self.index])
-                self.blackout |= self.index == 13
+            if previous != self.index:
+                self.start_cue()
             return False
 
         self.dialogue = None
@@ -65,6 +78,11 @@ class Opening:
         return False
 
     def update(self, dt, horizontal=0, vertical=0, turn_only=False):
+        if self.cue_remaining > 0:
+            self.cue_remaining = max(0, self.cue_remaining - dt)
+            if self.index == 13 and self.cue_remaining == 0:
+                self.blackout = True
+            return
         if self.dialogue:
             self.dialogue.update(dt)
             return
