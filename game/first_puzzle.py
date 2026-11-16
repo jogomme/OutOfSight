@@ -43,6 +43,8 @@ ROOMS = {
     'kitchen': (*BOUNDARY, (160, 450, 640, 530), (310, 270, 490, 333)),
     'bath': (*BOUNDARY, (520, 344, 700, 463), (210, 415, 280, 495)),
     'guest': ROOM_WALLS,
+    'upstairs': (*BOUNDARY, (370, 32, 398, 202), (370, 302, 398, 568),
+                 (115, 492, 315, 536), (520, 449, 700, 524), (490, 140, 647, 195)),
 }
 # Each portal stores its trigger, destination and corresponding arrival point.
 PORTALS = {
@@ -60,7 +62,8 @@ PORTALS = {
         ((712, 258, 746, 344), 'hall', (689, 496), '서비스 복도'),
     ),
     'bath': (((358, 43, 442, 75), 'hall', (623, 115), '서비스 복도'),),
-    'guest': (),
+    'guest': (((685, 173, 735, 258), 'upstairs', (132, 112), '2층 계단'),),
+    'upstairs': (((92, 42, 172, 82), 'guest', (650, 215), '1층 귀빈실'),),
 }
 
 
@@ -172,7 +175,7 @@ class FirstPuzzle:
 
     def exits(self, room):
         if room == 'guest':
-            return ((EXIT, 'hall', (712, 330), '서비스 복도'),)
+            return (*PORTALS[room], (EXIT, 'hall', (712, 330), '서비스 복도'))
         if room == 'hall' and self.door_open:
             return (*PORTALS[room], ((732, 300, 748, 360), 'guest', (88, 330), '귀빈실'))
         return PORTALS[room]

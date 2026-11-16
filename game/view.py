@@ -16,7 +16,7 @@ INK = (236, 222, 190)
 ITEM_LABELS = {'Guest register': '방문 기록부'}
 ROOM_LABELS = {
     'hall': '별장 1층', 'dining': '연회 식당', 'kitchen': '준비 주방',
-    'bath': '공용 욕실', 'guest': '귀빈실',
+    'bath': '공용 욕실', 'guest': '귀빈실', 'upstairs': '별장 2층 · 갤러리',
 }
 
 
