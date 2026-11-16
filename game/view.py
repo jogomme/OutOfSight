@@ -1,4 +1,5 @@
 from ctypes import byref, c_int
+from math import cos, tau
 from pathlib import Path
 
 import pico2d as canvas
@@ -90,7 +91,7 @@ class GameView:
             elif opening.dialogue is None:
                 canvas.draw_rectangle(464, 249, 476, 261, 38, 42, 51, filled=True)
                 canvas.draw_rectangle(466, 251, 474, 259, 139, 180, 189, filled=True)
-                self.text(446, 235, '휴대전화 [E]', 16)
+                self.draw_sparkle(PHONE, opening.puzzle.player.animation_time)
             self.draw_actor(opening.puzzle.player, 'protagonist', 56)
         else:
             path = folder / f'{background}.png'
@@ -98,9 +99,8 @@ class GameView:
             if background == 'outside':
                 self.draw_actor(opening.exterior, 'protagonist', 56)
                 if opening.dialogue is None:
-                    markers = {'bell': (DOORBELL, '초인종 [E]'), 'window': (WINDOW, '옆 창문 [E]'),
-                               'door': (DOORBELL, '현관문 [E]')}
-                    self.marker(*markers[opening.stage])
+                    target = WINDOW if opening.stage == 'window' else DOORBELL
+                    self.draw_sparkle(target, opening.exterior.animation_time)
         if opening.dialogue:
             self.draw_dialogue(opening.dialogue)
         else:
@@ -109,10 +109,20 @@ class GameView:
                 canvas.draw_rectangle(0, 0, WIDTH, 36, 17, 19, 23, filled=True)
                 self.text(22, 18, opening.message, 16)
 
-    def marker(self, point, label):
+    @staticmethod
+    def draw_sparkle(point, elapsed):
         x, y = point
-        canvas.draw_rectangle(x - 6, y - 5, x + 6, y + 5, 185, 137, 76, filled=True)
-        self.text(x - 24, y - 20, label, 16)
+        for dx, dy, offset, scale in ((0, 13, 0.0, 1.0), (9, 21, 0.24, 0.55)):
+            phase = (elapsed / 1.4 + offset) % 1
+            pulse = ((1 + cos(tau * phase)) * 0.5) ** 3
+            if pulse < 0.06:
+                continue
+            radius = max(1, round((2 + 4 * pulse) * scale))
+            color = (round(168 + 87 * pulse), round(122 + 105 * pulse), round(63 + 118 * pulse))
+            cx, cy = x + dx, y + dy
+            canvas.draw_line(cx - radius, cy, cx + radius, cy, *color)
+            canvas.draw_line(cx, cy - radius, cx, cy + radius, *color)
+            canvas.draw_rectangle(cx - 1, cy - 1, cx + 1, cy + 1, *color, filled=True)
 
     def draw_dialogue(self, dialogue):
         line = dialogue.line
@@ -197,7 +207,10 @@ class GameView:
             if abs(puzzle.player.x - (rect[0] + rect[2]) / 2) < 75 and abs(puzzle.player.y - (rect[1] + rect[3]) / 2) < 75:
                 self.text(rect[0], min(rect[1] - 10, 537), label, 14)
         if puzzle.in_guest_room and 'Guest register' not in puzzle.items:
-            self.text(403, 315, '방문 기록부 [E]', 14)
+            self.draw_sparkle((422, 336), puzzle.player.animation_time)
+        if puzzle.room == 'hall':
+            self.draw_sparkle((536, 330), puzzle.player.animation_time)
+            self.draw_sparkle((736, 330), puzzle.player.animation_time + 0.32)
 
     def draw_actor(self, actor, name, size):
         dx, dy = actor.facing
