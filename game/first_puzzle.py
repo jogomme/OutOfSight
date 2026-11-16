@@ -314,7 +314,7 @@ class FirstPuzzle:
             dx, dy = watcher.waypoint[0] - watcher.x, watcher.waypoint[1] - watcher.y
             step = min(WATCHER_SPEED * dt, hypot(dx, dy))
             if chasing and portal is None:
-                step = min(step, max(0, distance - 28))
+                step = min(step, max(0, distance - watcher.radius - self.player.radius))
             if step:
                 watcher.move(dx, dy, step, walls)
 
