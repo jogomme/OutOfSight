@@ -9,7 +9,7 @@ from .dialogue import wrap_text
 from .opening import DOORBELL, PHONE, PHONE_ITEM, RING_LINES, WINDOW
 from .lighting import Lighting
 
-from .first_puzzle import DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
+from .first_puzzle import COMMON_WALLS, DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
 
 
 ASSETS = Path(__file__).resolve().parent
@@ -91,7 +91,7 @@ class GameView:
                 offset = round(7 * sin(tau * progress) * (1 - progress))
                 viewport = sdl.SDL_Rect(offset, 0, WIDTH, HEIGHT)
                 sdl.SDL_RenderSetViewport(sdl.renderer, byref(viewport))
-            self.image(ASSETS / 'art' / 'hall.png').draw(400, 300, WIDTH, HEIGHT)
+            self.draw_hall()
             if opening.index is None or opening.index < 14:
                 canvas.draw_rectangle(402, 30, 470, 51, 49, 38, 28, filled=True)
                 canvas.draw_line(402, 51, 430, 70, 151, 105, 66)
@@ -180,6 +180,16 @@ class GameView:
         canvas.draw_rectangle(0, 0, WIDTH, HEIGHT, *color, alpha, filled=True)
         sdl.SDL_SetRenderDrawBlendMode(sdl.renderer, sdl.SDL_BLENDMODE_NONE)
 
+    def draw_hall(self):
+        self.image(ASSETS / 'art' / 'hall.png').draw(400, 300, WIDTH, HEIGHT)
+        for left, bottom, right, top in COMMON_WALLS:
+            # Match the movement bounds and leave the entry gaps on the wood floor.
+            canvas.draw_rectangle(left, bottom, right - 1, top - 1, 65, 58, 61, filled=True)
+            canvas.draw_rectangle(left + 2, bottom + 4, right - 3, top - 5, 97, 83, 81, filled=True)
+            canvas.draw_line(left + 2, top - 3, right - 3, top - 3, 156, 130, 106)
+            canvas.draw_line(left + 2, bottom + 4, right - 3, bottom + 4, 37, 31, 37)
+            canvas.draw_line(left + 2, bottom + 4, left + 2, top - 4, 126, 106, 95)
+
     @staticmethod
     def draw_locked_entrance():
         canvas.draw_rectangle(402, 30, 470, 51, 112, 75, 49, filled=True)
@@ -187,14 +197,16 @@ class GameView:
 
     def draw_play(self, scene):
         puzzle = scene.puzzle
-        self.image(ASSETS / 'art' / f'{puzzle.room}.png').draw(400, 300, WIDTH, HEIGHT)
         if puzzle.room == 'hall':
+            self.draw_hall()
             self.draw_locked_entrance()
             color = (172, 201, 138) if puzzle.door_open else (176, 128, 78)
             canvas.draw_rectangle(*PLATE, *color)
             door_color = (97, 163, 112) if puzzle.door_open else (151, 71, 57)
             canvas.draw_rectangle(*DOOR, *door_color, filled=True)
-        elif puzzle.in_guest_room:
+        else:
+            self.image(ASSETS / 'art' / f'{puzzle.room}.png').draw(400, 300, WIDTH, HEIGHT)
+        if puzzle.in_guest_room:
             canvas.draw_rectangle(*EXIT, 97, 163, 112)
             if 'Guest register' not in puzzle.items:
                 canvas.draw_rectangle(413, 330, 431, 342, 193, 158, 95, filled=True)
