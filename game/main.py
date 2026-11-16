@@ -8,6 +8,7 @@ if not __package__:
 
 from game.first_puzzle import HEIGHT, WIDTH, FirstPuzzle, contains
 from game.framework import run
+from game.opening import Opening
 from game.persistence import load_game, save_game
 from game.view import GameView
 
@@ -21,6 +22,8 @@ class LodgeScene:
         self.show_hints = True
         self.message = ''
         self.view = GameView()
+        self.opening = None
+        self.skip_update = False
 
     def set_screen(self, screen):
         self.screen = screen
@@ -28,6 +31,12 @@ class LodgeScene:
 
     def start(self):
         self.puzzle = FirstPuzzle()
+        self.opening = Opening(self.puzzle)
+        self.set_screen('opening')
+
+    def restart_puzzle(self):
+        self.puzzle = FirstPuzzle()
+        self.opening = None
         self.set_screen('play')
 
     def save(self):
@@ -72,7 +81,7 @@ class LodgeScene:
         elif self.screen == 'pause':
             actions = [
                 ('게임으로 돌아가기', self.back), ('저장하기', self.save), ('불러오기', self.load),
-                ('설정', self.settings), ('퍼즐 다시 시작', self.start),
+                ('설정', self.settings), ('퍼즐 다시 시작', self.restart_puzzle),
                 ('타이틀로 돌아가기', lambda: self.set_screen('title')),
             ]
         elif self.screen == 'settings':
@@ -96,6 +105,15 @@ class LodgeScene:
                     break
         if event.type != canvas.SDL_KEYDOWN:
             return
+        if self.screen == 'opening':
+            if event.key == canvas.SDLK_SPACE and not getattr(event, 'repeat', False):
+                if self.opening.advance():
+                    self.opening = None
+                    self.set_screen('play')
+                    self.skip_update = True
+            elif event.key == canvas.SDLK_e:
+                self.opening.interact()
+            return
         if event.key == canvas.SDLK_ESCAPE:
             self.back()
         elif self.screen == 'title' and event.key == canvas.SDLK_RETURN:
@@ -108,16 +126,26 @@ class LodgeScene:
             elif event.key == canvas.SDLK_e:
                 self.message = self.puzzle.interact()
             elif event.key == canvas.SDLK_r:
-                self.start()
+                self.restart_puzzle()
 
     def update(self, dt):
-        if self.screen != 'play' or not canvas.SDL_GetKeyboardFocus():
+        if self.skip_update:
+            self.skip_update = False
+            return
+        if self.screen == 'opening' and self.opening.dialogue:
+            self.opening.update(dt)
+            return
+        if self.screen not in ('play', 'opening') or not canvas.SDL_GetKeyboardFocus():
             return
         keys = canvas.SDL_GetKeyboardState(None)
         horizontal = keys[canvas.SDL_SCANCODE_D] - keys[canvas.SDL_SCANCODE_A]
         vertical = keys[canvas.SDL_SCANCODE_W] - keys[canvas.SDL_SCANCODE_S]
+        turn_only = keys[canvas.SDL_SCANCODE_SPACE]
+        if self.screen == 'opening':
+            self.opening.update(dt, horizontal, vertical, turn_only)
+            return
         room = self.puzzle.room
-        self.puzzle.update(horizontal, vertical, keys[canvas.SDL_SCANCODE_SPACE], dt)
+        self.puzzle.update(horizontal, vertical, turn_only, dt)
         if room != self.puzzle.room:
             self.message = ''
 

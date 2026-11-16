@@ -1,6 +1,11 @@
+from ctypes import byref, c_int
 from pathlib import Path
 
 import pico2d as canvas
+from pico2d import pico2d as sdl
+
+from .dialogue import wrap_text
+from .opening import DOORBELL, PHONE, WINDOW
 from .lighting import Lighting
 
 from .first_puzzle import DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
@@ -20,19 +25,27 @@ class GameView:
         self.images = {}
         self.fonts = {}
         self.lighting = Lighting()
+        self.sounds = {}
+        self.dialogue_layout = None
 
     def image(self, path):
         if path not in self.images:
             self.images[path] = canvas.load_image(str(path))
         return self.images[path]
 
-    def text(self, x, y, message, size=18):
+    def font(self, size):
         if size not in self.fonts:
             font = Path(canvas.__file__).parent / 'data' / 'ConsolaMalgun.ttf'
             self.fonts[size] = canvas.load_font(str(font), size)
-        self.fonts[size].draw(x, y, message, INK)
+        return self.fonts[size]
+
+    def text(self, x, y, message, size=18):
+        self.font(size).draw(x, y, message, INK)
 
     def draw(self, scene):
+        if scene.screen == 'opening':
+            self.draw_opening(scene.opening)
+            return
         if scene.screen == 'play':
             self.draw_play(scene)
             return
@@ -54,6 +67,82 @@ class GameView:
             self.text(rectangle[0] + 13, rectangle[1] + 20, label)
         if scene.message:
             self.text(62, 42, scene.message)
+
+    def draw_opening(self, opening):
+        folder = ASSETS / 'art' / 'opening'
+        for cue in opening.sounds:
+            sound = folder / f'{cue}.wav'
+            if sound.is_file():
+                if cue not in self.sounds:
+                    self.sounds[cue] = canvas.load_wav(str(sound))
+                self.sounds[cue].play()
+        opening.sounds.clear()
+
+        background = opening.background
+        if background == 'corridor':
+            self.image(ASSETS / 'art' / 'hall.png').draw(400, 300, WIDTH, HEIGHT)
+            if opening.blackout:
+                self.lighting.draw(opening.puzzle)
+                canvas.draw_rectangle(402, 40, 470, 51, 82, 57, 42, filled=True)
+                canvas.draw_rectangle(454, 43, 460, 47, 200, 160, 94, filled=True)
+            elif opening.dialogue is None:
+                self.marker(PHONE, '휴대전화 [E]')
+            self.draw_actor(opening.puzzle.player, 'protagonist', 56)
+        else:
+            path = folder / f'{background}.png'
+            self.image(path if path.is_file() else ASSETS / 'art' / 'title.png').draw(400, 300, WIDTH, HEIGHT)
+            if background == 'outside':
+                self.draw_actor(opening.exterior, 'protagonist', 56)
+                if opening.dialogue is None:
+                    markers = {'bell': (DOORBELL, '초인종 [E]'), 'window': (WINDOW, '옆 창문 [E]'),
+                               'door': (DOORBELL, '현관문 [E]')}
+                    self.marker(*markers[opening.stage])
+        if opening.dialogue:
+            self.draw_dialogue(opening.dialogue)
+        else:
+            self.text(22, 576, 'WASD 이동   E 조사', 16)
+            if opening.message:
+                canvas.draw_rectangle(0, 0, WIDTH, 36, 17, 19, 23, filled=True)
+                self.text(22, 18, opening.message, 16)
+
+    def marker(self, point, label):
+        x, y = point
+        canvas.draw_rectangle(x - 6, y - 5, x + 6, y + 5, 185, 137, 76, filled=True)
+        self.text(x - 24, y - 20, label, 16)
+
+    def draw_dialogue(self, dialogue):
+        line = dialogue.line
+        canvas.draw_rectangle(23, 15, 777, 166, 18, 21, 27, filled=True)
+        canvas.draw_rectangle(23, 15, 777, 166, 165, 130, 92)
+        canvas.draw_line(42, 126, 756, 126, 108, 85, 62)
+        self.text(42, 145, line.speaker, 19)
+
+        size = 22
+        if self.dialogue_layout is None or self.dialogue_layout[0] != line:
+            self.font(size)
+            def measure(text):
+                width, height = c_int(), c_int()
+                sdl.TTF_SizeUTF8(self.fonts[size].font, text.encode('utf-8'), byref(width), byref(height))
+                return width.value
+
+            rows = wrap_text(line.text, measure, 710)
+            while len(rows) > 3 and size > 10:
+                size -= 1
+                self.font(size)
+                rows = wrap_text(line.text, measure, 710)
+            self.dialogue_layout = (line, size, rows)
+
+        _, size, rows = self.dialogue_layout
+        remaining = int(dialogue.characters)
+        for index, row in enumerate(rows):
+            if remaining <= 0:
+                break
+            visible = row[:remaining].rstrip()
+            if visible:
+                self.text(42, 108 - index * (size + 5), visible, size)
+            remaining -= len(row) + 1 if '\n' in line.text and not row.endswith(' ') else len(row)
+        if dialogue.complete:
+            self.text(640, 31, 'Space 다음 ▸', 15)
 
     def draw_play(self, scene):
         puzzle = scene.puzzle
