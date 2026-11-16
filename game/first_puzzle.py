@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from heapq import heappop, heappush
 from math import cos, hypot, radians
 
 from .navigation import next_waypoint
@@ -11,7 +12,14 @@ VIEW_DISTANCE = 430
 VIEW_LIMIT = cos(radians(45))
 PLATE = (500, 288, 572, 372)
 DOOR = (744, 288, 768, 372)
-WATCHER_SPAWN = (292, 330)
+CHASE_DISTANCE = 430
+PATROL_WAIT = 1.2
+WATCHER_STARTS = (('hall', 292, 330), ('dining', 540, 460), ('bath', 350, 430))
+PATROLS = (
+    (('hall', 292, 330), ('hall', 460, 345)),
+    (('dining', 540, 460), ('dining', 620, 280), ('kitchen', 570, 200)),
+    (('bath', 350, 430), ('bath', 430, 185), ('hall', 620, 151)),
+)
 START = (436, 188)
 
 COMMON_WALLS = (
@@ -113,18 +121,36 @@ class Actor:
         )
 
 
+@dataclass
+class Watcher(Actor):
+    room: str = 'hall'
+    active: bool = False
+    patrol_index: int = 0
+    wait_remaining: float = 0.0
+    waypoint: tuple[float, float] | None = None
+    route_remaining: float = 0.0
+    route_goal: tuple | None = None
+
+
+def portal_center(rect):
+    left, bottom, right, top = rect
+    return (left + right) / 2, (bottom + top) / 2
+
+
 class FirstPuzzle:
     def __init__(self):
         self.player = Actor(*START, 12)
-        self.watchers = [
-            Actor(*WATCHER_SPAWN, 10), Actor(94, 148, 10), Actor(116, 488, 10),
-        ]
+        self.watchers = [Watcher(x, y, 10, room=room) for room, x, y in WATCHER_STARTS]
         self.room = 'hall'
         self.solved = False
         self.flashlight = True
         self.items = []
-        self._routes = {}
-        self._route_time = 0.0
+        self.activate_room()
+
+    def activate_room(self):
+        for watcher, (room, _, _) in zip(self.watchers, WATCHER_STARTS):
+            if room == self.room:
+                watcher.active = True
 
     @property
     def in_guest_room(self):
@@ -132,15 +158,24 @@ class FirstPuzzle:
 
     @property
     def door_open(self):
-        return any(contains(PLATE, watcher.x, watcher.y) for watcher in self.watchers)
+        return any(watcher.room == 'hall' and contains(PLATE, watcher.x, watcher.y)
+                   for watcher in self.watchers)
 
     @property
     def walls(self):
-        if self.room != 'hall':
-            return ROOMS[self.room]
-        if self.door_open:
-            return COMMON_WALLS
-        return (*COMMON_WALLS, DOOR)
+        return self.walls_for(self.room)
+
+    def walls_for(self, room):
+        if room != 'hall':
+            return ROOMS[room]
+        return COMMON_WALLS if self.door_open else (*COMMON_WALLS, DOOR)
+
+    def exits(self, room):
+        if room == 'guest':
+            return ((EXIT, 'hall', (712, 330), 'Service Hall'),)
+        if room == 'hall' and self.door_open:
+            return (*PORTALS[room], ((732, 300, 748, 360), 'guest', (88, 330), 'Guest Room'))
+        return PORTALS[room]
 
     def light_at(self, x, y, walls=None):
         dx, dy = x - self.player.x, y - self.player.y
@@ -159,7 +194,7 @@ class FirstPuzzle:
         return 0
 
     def observed(self, watcher):
-        return self.light_at(watcher.x, watcher.y) == 2
+        return watcher.room == self.room and self.light_at(watcher.x, watcher.y) == 2
 
     def interact(self):
         x, y = self.player.x, self.player.y
@@ -178,51 +213,87 @@ class FirstPuzzle:
         self.player.move(horizontal, vertical, 0 if turn_only else PLAYER_SPEED * dt, self.walls)
 
         self.player.animation_time += dt
-        for trigger, room, arrival, _ in PORTALS[self.room]:
+        for trigger, room, arrival, _ in self.exits(self.room):
             if contains(trigger, self.player.x, self.player.y):
                 self.room = room
-                self._routes.clear()
                 self.player.x, self.player.y = arrival
-                return
+                self.solved |= room == 'guest'
+                self.activate_room()
+                break
 
-        if self.in_guest_room:
-            if contains(EXIT, self.player.x, self.player.y):
-                self.room = 'hall'
-                self.player.x, self.player.y = 712, 330
-            return
-
-        if self.room != 'hall':
-            return
-
-        door_left, door_bottom, door_right, door_top = DOOR
-        radius = self.player.radius
-        doorway = (door_left - radius, door_bottom + radius, door_right, door_top - radius)
-        if self.door_open and contains(doorway, self.player.x, self.player.y):
-            self.room = 'guest'
-            self._routes.clear()
-            self.solved = True
-            self.player.x, self.player.y = 88, 330
-            return
-
-        self._route_time -= dt
-        refresh = self._route_time <= 0
-        if refresh:
-            self._route_time = 0.15
         for index, watcher in enumerate(self.watchers):
-            if self.observed(watcher):
-                self._routes.pop(index, None)
+            self.update_watcher(watcher, PATROLS[index], dt)
+
+    def route_to(self, watcher, room, target):
+        origin = (watcher.x, watcher.y)
+        if watcher.room == room:
+            return hypot(target[0] - origin[0], target[1] - origin[1]), target, None
+
+        # Room distances follow door links. Local obstacle avoidance is handled by A*.
+        frontier = [(0.0, watcher.room, origin, None)]
+        best = {(watcher.room, origin): 0.0}
+        result = (float('inf'), None, None)
+        while frontier:
+            cost, current, point, first = heappop(frontier)
+            if cost >= result[0]:
+                break
+            if current == room:
+                distance = cost + hypot(target[0] - point[0], target[1] - point[1])
+                if distance < result[0]:
+                    result = distance, portal_center(first[0]), first
                 continue
-            if refresh or index not in self._routes:
-                self._routes[index] = next_waypoint(
-                    watcher, (self.player.x, self.player.y), self.walls,
-                    WIDTH, HEIGHT, intersects_segment,
-                )
-            waypoint = self._routes[index]
-            watcher.moving = False
-            if waypoint is not None:
-                dx, dy = waypoint[0] - watcher.x, waypoint[1] - watcher.y
-                separation = hypot(self.player.x - watcher.x, self.player.y - watcher.y)
-                distance = min(WATCHER_SPEED * dt, hypot(dx, dy), max(0, separation - 28))
-                if distance:
-                    watcher.move(dx, dy, distance, self.walls)
-            watcher.animation_time += dt
+            for link in self.exits(current):
+                trigger, destination, arrival, _ = link
+                center = portal_center(trigger)
+                distance = cost + hypot(center[0] - point[0], center[1] - point[1]) + 1
+                key = destination, arrival
+                if distance < best.get(key, float('inf')):
+                    best[key] = distance
+                    heappush(frontier, (distance, destination, arrival, first or link))
+        return result
+
+    def update_watcher(self, watcher, patrol, dt):
+        if not watcher.active or self.observed(watcher):
+            watcher.route_remaining = 0
+            return
+
+        distance, goal, portal = self.route_to(watcher, self.room, (self.player.x, self.player.y))
+        chasing = distance <= CHASE_DISTANCE
+        if not chasing:
+            if watcher.wait_remaining > 0:
+                watcher.wait_remaining = max(0, watcher.wait_remaining - dt)
+                watcher.moving = False
+                watcher.animation_time += dt
+                return
+            room, x, y = patrol[watcher.patrol_index]
+            _, goal, portal = self.route_to(watcher, room, (x, y))
+            if watcher.room == room and hypot(x - watcher.x, y - watcher.y) < 1:
+                watcher.patrol_index = (watcher.patrol_index + 1) % len(patrol)
+                watcher.wait_remaining = PATROL_WAIT
+                goal = None
+
+        watcher.animation_time += dt
+        watcher.moving = False
+        if goal is None:
+            return
+
+        walls = self.walls_for(watcher.room)
+        route_goal = (watcher.room, portal, walls, chasing, None if chasing else goal)
+        watcher.route_remaining -= dt
+        if watcher.route_remaining <= 0 or watcher.route_goal != route_goal:
+            watcher.waypoint = next_waypoint(watcher, goal, walls, WIDTH, HEIGHT, intersects_segment)
+            watcher.route_remaining = 0.15
+            watcher.route_goal = route_goal
+
+        if watcher.waypoint is not None:
+            dx, dy = watcher.waypoint[0] - watcher.x, watcher.waypoint[1] - watcher.y
+            step = min(WATCHER_SPEED * dt, hypot(dx, dy))
+            if chasing and portal is None:
+                step = min(step, max(0, distance - 28))
+            if step:
+                watcher.move(dx, dy, step, walls)
+
+        if portal is not None and contains(portal[0], watcher.x, watcher.y):
+            _, watcher.room, arrival, _ = portal
+            watcher.x, watcher.y = arrival
+            watcher.route_remaining = 0

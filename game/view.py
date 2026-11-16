@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pico2d as canvas
-from pico2d import pico2d as renderer
+from .lighting import Lighting
 
 from .first_puzzle import DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
 
@@ -18,8 +18,7 @@ class GameView:
     def __init__(self):
         self.images = {}
         self.fonts = {}
-        self.mask_key = None
-        self.mask = []
+        self.lighting = Lighting()
 
     def image(self, path):
         if path not in self.images:
@@ -71,14 +70,15 @@ class GameView:
             canvas.draw_rectangle(*rectangle, 151, 134, 96)
 
         hidden = []
-        if puzzle.room == 'hall':
-            for watcher in sorted(puzzle.watchers, key=lambda actor: -actor.y):
-                if puzzle.light_at(watcher.x, watcher.y):
-                    self.draw_actor(watcher, 'watcher', 64)
-                else:
-                    hidden.append(watcher)
+        for watcher in sorted(puzzle.watchers, key=lambda actor: -actor.y):
+            if watcher.room != puzzle.room:
+                continue
+            if puzzle.light_at(watcher.x, watcher.y):
+                self.draw_actor(watcher, 'watcher', 64)
+            else:
+                hidden.append(watcher)
 
-        self.draw_shadows(puzzle)
+        self.lighting.draw(puzzle)
         for watcher in hidden:
             x, y = round(watcher.x), round(watcher.y) + 28
             canvas.draw_rectangle(x - 4, y, x - 3, y + 1, 208, 191, 150, filled=True)
@@ -97,30 +97,6 @@ class GameView:
                 self.text(rect[0], min(rect[1] - 10, 537), label, 14)
         if puzzle.in_guest_room and 'Guest register' not in puzzle.items:
             self.text(403, 315, 'Register / E', 14)
-
-    def draw_shadows(self, puzzle):
-        player = puzzle.player
-        walls = puzzle.walls
-        key = (round(player.x / 5), round(player.y / 5), player.facing, walls, puzzle.flashlight)
-        if key != self.mask_key:
-            self.mask_key = key
-            self.mask = []
-            step = 16
-            shades = (226, 170, 38 if puzzle.flashlight else 130)
-            for y in range(0, HEIGHT, step):
-                start = 0
-                previous = None
-                for x in range(0, WIDTH + step, step):
-                    shade = shades[puzzle.light_at(x + step / 2, y + step / 2, walls)] if x < WIDTH else None
-                    if shade != previous:
-                        if previous is not None:
-                            self.mask.append((start, y, x - 1, min(y + step, HEIGHT) - 1, previous))
-                        start, previous = x, shade
-
-        renderer.SDL_SetRenderDrawBlendMode(renderer.renderer, renderer.SDL_BLENDMODE_BLEND)
-        for x1, y1, x2, y2, shade in self.mask:
-            canvas.draw_rectangle(x1, y1, x2, y2, 8, 11, 16, shade, filled=True)
-        renderer.SDL_SetRenderDrawBlendMode(renderer.renderer, renderer.SDL_BLENDMODE_NONE)
 
     def draw_actor(self, actor, name, size):
         dx, dy = actor.facing
