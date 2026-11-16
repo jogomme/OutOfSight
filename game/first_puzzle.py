@@ -212,10 +212,24 @@ class FirstPuzzle:
             return '감시자가 발판에 올라가면 작동합니다.'
         return '근처에 조사할 건 없는 것 같아.'
 
+    @property
+    def caught(self):
+        player = self.player
+        return any(
+            watcher.room == self.room
+            and abs(player.x - watcher.x) <= player.radius + watcher.radius
+            and abs(player.y - watcher.y) <= player.radius + watcher.radius
+            for watcher in self.watchers
+        )
+
     def update(self, horizontal, vertical, turn_only, dt, transition=None):
+        if self.caught:
+            return
         self.player.move(horizontal, vertical, 0 if turn_only else PLAYER_SPEED * dt, self.walls)
 
         self.player.animation_time += dt
+        if self.caught:
+            return
         for trigger, room, arrival, _ in self.exits(self.room):
             if contains(trigger, self.player.x, self.player.y):
                 if transition is not None:
@@ -225,6 +239,8 @@ class FirstPuzzle:
                 break
 
         for index, watcher in enumerate(self.watchers):
+            if self.caught:
+                return
             self.update_watcher(watcher, PATROLS[index], dt)
 
     def enter_room(self, room, arrival):

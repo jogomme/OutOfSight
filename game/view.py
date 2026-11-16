@@ -60,9 +60,12 @@ class GameView:
         self.image(ASSETS / 'art' / f'{backdrop}.png').draw(400, 300, WIDTH, HEIGHT)
         title = {
             'title': 'OUT OF SIGHT', 'pause': '일시 정지',
-            'inventory': '소지품', 'settings': '설정',
+            'inventory': '소지품', 'settings': '설정', 'game_over': 'GAME OVER',
         }[scene.screen]
-        self.text(62, 447, title, 48)
+        if scene.screen == 'game_over':
+            self.text(267, 350, title, 54)
+        else:
+            self.text(62, 447, title, 48)
         if scene.screen == 'inventory':
             items = ['손전등', *(ITEM_LABELS[item] for item in scene.puzzle.items)]
             for index, item in enumerate(items):

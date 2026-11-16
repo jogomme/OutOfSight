@@ -139,6 +139,8 @@ class LodgeScene:
     def buttons(self):
         if self.screen == 'title':
             actions = [('새 게임', self.start), ('이어하기', self.load), ('설정', self.settings)]
+        elif self.screen == 'game_over':
+            actions = [('이어하기', self.load), ('타이틀로 돌아가기', lambda: self.set_screen('title'))]
         elif self.screen == 'pause':
             actions = [
                 ('게임으로 돌아가기', self.back), ('저장하기', self.save), ('불러오기', self.load),
@@ -152,6 +154,9 @@ class LodgeScene:
             actions = [('뒤로', self.back)]
         else:
             return []
+        if self.screen == 'game_over':
+            return [((275, 216 - index * 46, 525, 255 - index * 46), label, action)
+                    for index, (label, action) in enumerate(actions)]
         top = 336 if self.screen != 'inventory' else 155
         return [
             ((62, top - 39 - index * 46, 311, top - index * 46), label, action)
@@ -224,11 +229,15 @@ class LodgeScene:
             self.opening.update(dt, horizontal, vertical, turn_only)
             return
         self.puzzle.update(horizontal, vertical, turn_only, dt, self.transition_room)
+        if self.puzzle.caught:
+            self.set_screen('game_over')
 
     def transition_room(self, enter):
         def switch():
             enter()
             self.message = ''
+            if self.puzzle.caught:
+                self.set_screen('game_over')
 
         self.transition(switch)
 
