@@ -47,19 +47,19 @@ ROOMS = {
 # Each portal stores its trigger, destination and corresponding arrival point.
 PORTALS = {
     'hall': (
-        ((235, 524, 321, 556), 'dining', (400, 100), 'Dining Hall'),
-        ((647, 438, 731, 465), 'kitchen', (682, 300), 'Kitchen'),
-        ((586, 55, 660, 84), 'bath', (400, 100), 'Washroom'),
+        ((235, 524, 321, 556), 'dining', (400, 100), '연회 식당'),
+        ((647, 438, 731, 465), 'kitchen', (682, 300), '준비 주방'),
+        ((586, 55, 660, 84), 'bath', (400, 100), '공용 욕실'),
     ),
     'dining': (
-        ((358, 43, 442, 75), 'hall', (278, 490), 'Main Hall'),
-        ((679, 278, 722, 355), 'kitchen', (130, 300), 'Kitchen'),
+        ((358, 43, 442, 75), 'hall', (278, 490), '접객 홀'),
+        ((679, 278, 722, 355), 'kitchen', (130, 300), '준비 주방'),
     ),
     'kitchen': (
-        ((53, 258, 95, 344), 'dining', (650, 315), 'Dining Hall'),
-        ((712, 258, 746, 344), 'hall', (689, 496), 'Service Hall'),
+        ((53, 258, 95, 344), 'dining', (650, 315), '연회 식당'),
+        ((712, 258, 746, 344), 'hall', (689, 496), '서비스 복도'),
     ),
-    'bath': (((358, 43, 442, 75), 'hall', (623, 115), 'Service Hall'),),
+    'bath': (((358, 43, 442, 75), 'hall', (623, 115), '서비스 복도'),),
     'guest': (),
 }
 
@@ -172,9 +172,9 @@ class FirstPuzzle:
 
     def exits(self, room):
         if room == 'guest':
-            return ((EXIT, 'hall', (712, 330), 'Service Hall'),)
+            return ((EXIT, 'hall', (712, 330), '서비스 복도'),)
         if room == 'hall' and self.door_open:
-            return (*PORTALS[room], ((732, 300, 748, 360), 'guest', (88, 330), 'Guest Room'))
+            return (*PORTALS[room], ((732, 300, 748, 360), 'guest', (88, 330), '귀빈실'))
         return PORTALS[room]
 
     def light_at(self, x, y, walls=None):
@@ -201,13 +201,13 @@ class FirstPuzzle:
         if self.in_guest_room and hypot(x - 422, y - 336) <= 48:
             if 'Guest register' not in self.items:
                 self.items.append('Guest register')
-                return 'Guest register added to inventory.'
-            return 'The guest register is already in your inventory.'
+                return '방문 기록부를 챙겼습니다.'
+            return '이미 방문 기록부를 가지고 있습니다.'
         if self.room == 'hall' and hypot(x - 736, y - 330) <= 62:
-            return 'The plate holds the door open.' if self.door_open else 'Locked. A Watcher can hold down the plate.'
+            return '발판이 눌려 있어 문이 열려 있습니다.' if self.door_open else '문이 잠겨 있습니다. 감시자가 발판을 누르면 열릴 것 같습니다.'
         if self.room == 'hall' and hypot(x - 536, y - 330) <= 62:
-            return 'The plate responds to a Watcher.'
-        return 'Nothing to inspect nearby.'
+            return '감시자가 발판에 올라가면 작동합니다.'
+        return '근처에 조사할 것이 없습니다.'
 
     def update(self, horizontal, vertical, turn_only, dt):
         self.player.move(horizontal, vertical, 0 if turn_only else PLAYER_SPEED * dt, self.walls)

@@ -8,9 +8,10 @@ from .first_puzzle import DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
 
 ASSETS = Path(__file__).resolve().parent
 INK = (236, 222, 190)
+ITEM_LABELS = {'Guest register': '방문 기록부'}
 ROOM_LABELS = {
-    'hall': 'Lodge / First Floor', 'dining': 'Dining Hall', 'kitchen': 'Kitchen',
-    'bath': 'Washroom', 'guest': 'Guest Room',
+    'hall': '별장 1층', 'dining': '연회 식당', 'kitchen': '준비 주방',
+    'bath': '공용 욕실', 'guest': '귀빈실',
 }
 
 
@@ -39,12 +40,13 @@ class GameView:
         backdrop = 'settings' if scene.screen == 'pause' else scene.screen
         self.image(ASSETS / 'art' / f'{backdrop}.png').draw(400, 300, WIDTH, HEIGHT)
         title = {
-            'title': 'OUT OF SIGHT', 'pause': 'Paused',
-            'inventory': 'Inventory', 'settings': 'Settings',
+            'title': 'OUT OF SIGHT', 'pause': '일시 정지',
+            'inventory': '소지품', 'settings': '설정',
         }[scene.screen]
         self.text(62, 447, title, 48)
         if scene.screen == 'inventory':
-            for index, item in enumerate(['Flashlight', *scene.puzzle.items]):
+            items = ['손전등', *(ITEM_LABELS[item] for item in scene.puzzle.items)]
+            for index, item in enumerate(items):
                 self.text(66, 359 - index * 36, item, 22)
         for rectangle, label, _ in scene.buttons():
             canvas.draw_rectangle(*rectangle, 23, 27, 32, filled=True)
@@ -88,7 +90,7 @@ class GameView:
         canvas.draw_rectangle(0, 552, WIDTH, HEIGHT, 17, 19, 23, filled=True)
         self.text(19, 579, ROOM_LABELS[puzzle.room], 20)
         if scene.show_hints:
-            self.text(19, 560, 'WASD Move   Space+WASD Turn   E Inspect   F Light   Tab Bag   Esc Menu', 14)
+            self.text(19, 560, 'WASD 이동   Space+WASD 방향 전환   E 조사   F 손전등   Tab 소지품   Esc 메뉴', 14)
         if scene.message:
             canvas.draw_rectangle(0, 0, WIDTH, 32, 17, 19, 23, filled=True)
             self.text(19, 16, scene.message, 16)
@@ -96,7 +98,7 @@ class GameView:
             if abs(puzzle.player.x - (rect[0] + rect[2]) / 2) < 75 and abs(puzzle.player.y - (rect[1] + rect[3]) / 2) < 75:
                 self.text(rect[0], min(rect[1] - 10, 537), label, 14)
         if puzzle.in_guest_room and 'Guest register' not in puzzle.items:
-            self.text(403, 315, 'Register / E', 14)
+            self.text(403, 315, '방문 기록부 [E]', 14)
 
     def draw_actor(self, actor, name, size):
         dx, dy = actor.facing

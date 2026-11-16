@@ -34,22 +34,22 @@ class LodgeScene:
         try:
             save_game(self.save_path, self.puzzle, self.show_hints)
         except OSError:
-            self.message = 'Save failed. Check whether the save directory is writable.'
+            self.message = '저장하지 못했습니다. 저장 폴더의 쓰기 권한을 확인해 주세요.'
         else:
-            self.message = 'Progress saved.'
+            self.message = '진행 상황을 저장했습니다.'
 
     def load(self):
         try:
             puzzle, hints = load_game(self.save_path)
         except FileNotFoundError:
-            self.message = 'No save found.'
+            self.message = '저장된 게임이 없습니다.'
         except (OSError, ValueError, TypeError, KeyError, OverflowError):
-            self.message = 'The save could not be read.'
+            self.message = '저장된 게임을 읽을 수 없습니다.'
         else:
             self.puzzle = puzzle
             self.show_hints = hints
             self.set_screen('play')
-            self.message = 'Progress restored.'
+            self.message = '저장한 게임을 불러왔습니다.'
 
     def settings(self):
         self.settings_parent = self.screen
@@ -68,18 +68,18 @@ class LodgeScene:
 
     def buttons(self):
         if self.screen == 'title':
-            actions = [('New Game', self.start), ('Continue', self.load), ('Settings', self.settings)]
+            actions = [('새 게임', self.start), ('이어하기', self.load), ('설정', self.settings)]
         elif self.screen == 'pause':
             actions = [
-                ('Resume', self.back), ('Save Game', self.save), ('Load Game', self.load),
-                ('Settings', self.settings), ('Restart Puzzle', self.start),
-                ('Title Screen', lambda: self.set_screen('title')),
+                ('게임으로 돌아가기', self.back), ('저장하기', self.save), ('불러오기', self.load),
+                ('설정', self.settings), ('퍼즐 다시 시작', self.start),
+                ('타이틀로 돌아가기', lambda: self.set_screen('title')),
             ]
         elif self.screen == 'settings':
-            state = 'On' if self.show_hints else 'Off'
-            actions = [(f'Control Hints / {state}', self.toggle_hints), ('Back', self.back)]
+            state = '켜짐' if self.show_hints else '꺼짐'
+            actions = [(f'조작 안내 · {state}', self.toggle_hints), ('뒤로', self.back)]
         elif self.screen == 'inventory':
-            actions = [('Back', self.back)]
+            actions = [('뒤로', self.back)]
         else:
             return []
         top = 336 if self.screen != 'inventory' else 155
