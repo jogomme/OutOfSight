@@ -1,7 +1,7 @@
 from math import hypot
 
 from .dialogue import Dialogue, load_script
-from .first_puzzle import Actor, HEIGHT, PLAYER_SPEED, WIDTH
+from .first_puzzle import Actor, FIRST_ENCOUNTER, HEIGHT, PLAYER_SPEED, WIDTH
 
 
 EXTERIOR_WALLS = (
@@ -10,7 +10,7 @@ EXTERIOR_WALLS = (
 )
 DOORBELL = (400, 270)
 WINDOW = (630, 270)
-PHONE = (470, 255)
+PHONE = FIRST_ENCOUNTER
 PHONE_ITEM = 'Sibling phone'
 THUNDER_DURATION = 0.30
 THUNDER_LINE = 15
@@ -100,6 +100,7 @@ class Opening:
             return
         if self.stage == 'phone':
             if self.near(self.puzzle.player, PHONE):
+                self.puzzle.player.x, self.puzzle.player.y = PHONE
                 self.puzzle.items.append(PHONE_ITEM)
                 self.begin(14, 19)
             else:

@@ -11,16 +11,18 @@ WATCHER_SPEED = 55
 VIEW_DISTANCE = 430
 VIEW_LIMIT = cos(radians(45))
 PLATE = (500, 288, 572, 372)
+DOOR_APPROACH = (726, 330)
 DOOR = (744, 288, 768, 372)
 CHASE_DISTANCE = 430
 PATROL_WAIT = 1.2
-WATCHER_STARTS = (('hall', 292, 330), ('dining', 540, 460), ('bath', 350, 430))
+WATCHER_STARTS = (('hall', 224, 330), ('dining', 540, 460), ('bath', 350, 430))
 PATROLS = (
-    (('hall', 292, 330), ('hall', 460, 345)),
+    (('hall', 224, 330), ('hall', 460, 345)),
     (('dining', 540, 460), ('dining', 620, 280), ('kitchen', 570, 200)),
     (('bath', 350, 430), ('bath', 430, 185), ('hall', 620, 151)),
 )
 START = (436, 188)
+FIRST_ENCOUNTER = (500, 245)
 
 COMMON_WALLS = (
     (0, 0, 32, 600), (768, 0, 800, 600),
@@ -207,9 +209,9 @@ class FirstPuzzle:
                 return '방문 기록부를 챙겼습니다.'
             return '이미 방문 기록부를 가지고 있습니다.'
         if self.room == 'hall' and hypot(x - 736, y - 330) <= 62:
-            return '발판이 눌려 있어 문이 열려 있습니다.' if self.door_open else '문이 잠겨 있습니다. 감시자가 발판을 누르면 열릴 것 같습니다.'
+            return '잠금쇠가 내려가 있어.' if self.door_open else '문 아래 금속 띠가 바닥 쪽으로 이어져 있어.'
         if self.room == 'hall' and hypot(x - 536, y - 330) <= 62:
-            return '감시자가 발판에 올라가면 작동합니다.'
+            return '발판 옆 금속 띠가 문틀 아래로 이어져 있어.'
         return '근처에 조사할 건 없는 것 같아.'
 
     @property

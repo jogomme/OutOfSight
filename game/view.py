@@ -1,5 +1,5 @@
 from ctypes import byref, c_int
-from math import cos, sin, tau
+from math import cos, hypot, sin, tau
 from pathlib import Path
 
 import pico2d as canvas
@@ -9,7 +9,7 @@ from .dialogue import wrap_text
 from .opening import DOORBELL, DOOR_SLAM_LINE, PHONE, PHONE_ITEM, THUNDER_LINE, WINDOW
 from .lighting import Lighting
 
-from .first_puzzle import COMMON_WALLS, DOOR, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
+from .first_puzzle import COMMON_WALLS, DOOR, DOOR_APPROACH, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
 
 
 ASSETS = Path(__file__).resolve().parent
@@ -29,6 +29,7 @@ class GameView:
         self.fonts = {}
         self.lighting = Lighting()
         self.sounds = {}
+        self.watcher_channel = -1
         self.dialogue_layout = None
 
     def image(self, path):
@@ -81,13 +82,40 @@ class GameView:
         if scene.message:
             self.text(62, 42, scene.message)
 
+    def sound(self, cue):
+        if cue not in self.sounds:
+            sound = ASSETS / 'art' / 'opening' / f'{cue}.wav'
+            self.sounds[cue] = canvas.load_wav(str(sound))
+        return self.sounds[cue]
+
+    def play_sound(self, cue):
+        if sdl.audio_on:
+            self.sound(cue).play()
+
+    def update_watcher_audio(self, puzzle, listening):
+        if not sdl.audio_on:
+            return
+        player = puzzle.player
+        distance = min((
+            hypot(watcher.x - player.x, watcher.y - player.y)
+            for watcher in puzzle.watchers
+            if listening and watcher.room == puzzle.room and watcher.active
+            and watcher.moving and not puzzle.observed(watcher)
+        ), default=360)
+        volume = round(72 * max(0.0, 1 - distance / 360))
+        if volume:
+            if self.watcher_channel < 0 or not sdl.Mix_Playing(self.watcher_channel):
+                self.watcher_channel = sdl.Mix_PlayChannel(-1, self.sound('footsteps').wav, -1)
+            if self.watcher_channel >= 0:
+                sdl.Mix_Volume(self.watcher_channel, volume)
+        elif self.watcher_channel >= 0:
+            sdl.Mix_HaltChannel(self.watcher_channel)
+            sdl.Mix_Volume(self.watcher_channel, 128)
+            self.watcher_channel = -1
+
     def draw_opening(self, opening):
-        folder = ASSETS / 'art' / 'opening'
         for cue in opening.sounds:
-            sound = folder / f'{cue}.wav'
-            if cue not in self.sounds:
-                self.sounds[cue] = canvas.load_wav(str(sound))
-            self.sounds[cue].play()
+            self.play_sound(cue)
         opening.sounds.clear()
 
         background = opening.background
@@ -200,15 +228,28 @@ class GameView:
         canvas.draw_rectangle(402, 30, 470, 51, 112, 75, 49, filled=True)
         canvas.draw_rectangle(454, 43, 460, 47, 237, 189, 108, filled=True)
 
+    @staticmethod
+    def draw_plate_and_door(pressed):
+        left, bottom, right, top = PLATE
+        _, door_y = DOOR_APPROACH
+        canvas.draw_rectangle(right, door_y - 4, DOOR[0], door_y + 3, 64, 55, 48, filled=True)
+        canvas.draw_line(right, door_y + 1, DOOR[0], door_y + 1, 152, 129, 97)
+        canvas.draw_rectangle(left, bottom, right, top, 130, 105, 71)
+        inset = 6 if pressed else 3
+        color = (115, 133, 92) if pressed else (160, 136, 94)
+        canvas.draw_rectangle(left + inset, bottom + inset, right - inset, top - inset, *color, filled=True)
+        canvas.draw_line(left + inset, top - inset, right - inset, top - inset, 208, 186, 137)
+        door_color = (97, 163, 112) if pressed else (151, 71, 57)
+        canvas.draw_rectangle(*DOOR, *door_color, filled=True)
+        approach_x, _ = DOOR_APPROACH
+        canvas.draw_line(approach_x, door_y - 27, approach_x, door_y + 27, 148, 120, 83)
+
     def draw_play(self, scene):
         puzzle = scene.puzzle
         if puzzle.room == 'hall':
             self.draw_hall()
             self.draw_locked_entrance()
-            color = (172, 201, 138) if puzzle.door_open else (176, 128, 78)
-            canvas.draw_rectangle(*PLATE, *color)
-            door_color = (97, 163, 112) if puzzle.door_open else (151, 71, 57)
-            canvas.draw_rectangle(*DOOR, *door_color, filled=True)
+            self.draw_plate_and_door(puzzle.door_open)
         else:
             self.image(ASSETS / 'art' / f'{puzzle.room}.png').draw(400, 300, WIDTH, HEIGHT)
         if puzzle.in_guest_room:

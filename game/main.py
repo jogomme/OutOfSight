@@ -7,9 +7,9 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from game.dialogue import Dialogue, Line
-from game.first_puzzle import HEIGHT, WIDTH, FirstPuzzle, contains
+from game.first_puzzle import FIRST_ENCOUNTER, HEIGHT, WIDTH, FirstPuzzle, contains
 from game.framework import run
-from game.opening import Opening, WINDOW
+from game.opening import Opening, PHONE_ITEM, WINDOW
 from game.persistence import load_game, save_game
 from game.view import GameView, SKIP_BUTTON
 
@@ -90,6 +90,8 @@ class LodgeScene:
         return round(255 * max(0.0, min(1.0, (2 * FADE_TIME + BLACK_HOLD - elapsed) / FADE_TIME)))
 
     def finish_opening(self):
+        self.puzzle.player.x, self.puzzle.player.y = FIRST_ENCOUNTER
+        self.puzzle.player.facing = (1, 0)
         self.opening = None
         self.set_screen('play')
         self.skip_update = True
@@ -134,9 +136,14 @@ class LodgeScene:
 
     def restart_puzzle(self):
         self.autosave_elapsed = 0.0
+        has_phone = PHONE_ITEM in self.puzzle.items
         self.puzzle = FirstPuzzle()
-        self.opening = None
-        self.set_screen('play')
+        if has_phone:
+            self.puzzle.items.append(PHONE_ITEM)
+            self.finish_opening()
+        else:
+            self.opening = None
+            self.set_screen('play')
 
     def save(self, automatic=False):
         path = self.save_path
@@ -202,7 +209,13 @@ class LodgeScene:
         elif self.screen == 'confirm_slot':
             actions = [('이 슬롯으로 시작', lambda: self.start_in_slot(self.pending_slot)), ('뒤로', self.back)]
         elif self.screen == 'game_over':
-            actions = [('이어하기', self.load), ('타이틀로 돌아가기', lambda: self.set_screen('title'))]
+            actions = []
+            if self.save_path and self.save_path.is_file():
+                actions.append(('이어하기', self.load))
+            actions.extend([
+                ('첫 퍼즐 다시 시도', self.restart_puzzle),
+                ('타이틀로 돌아가기', lambda: self.set_screen('title')),
+            ])
         elif self.screen == 'pause':
             actions = [
                 ('게임으로 돌아가기', self.back), ('저장하기', self.save), ('불러오기', self.load),
@@ -290,7 +303,10 @@ class LodgeScene:
         if self.screen == 'opening':
             self.opening.update(dt, horizontal, vertical, turn_only)
             return
+        door_was_open = self.puzzle.door_open
         self.puzzle.update(horizontal, vertical, turn_only, dt, self.transition_room)
+        if self.puzzle.room == 'hall' and door_was_open != self.puzzle.door_open:
+            self.view.play_sound('lock')
         if self.puzzle.caught:
             self.set_screen('game_over')
             return
@@ -308,6 +324,9 @@ class LodgeScene:
         self.transition(switch)
 
     def draw(self):
+        listening = (self.screen == 'play' and self.thought is None
+                     and self.fade_elapsed is None and canvas.SDL_GetKeyboardFocus())
+        self.view.update_watcher_audio(self.puzzle, listening)
         self.view.draw(self)
         if self.thought:
             self.view.draw_dialogue(self.thought)
