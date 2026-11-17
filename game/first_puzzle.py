@@ -206,8 +206,7 @@ class FirstPuzzle:
         if self.in_guest_room and hypot(x - 422, y - 336) <= 48:
             if 'Guest register' not in self.items:
                 self.items.append('Guest register')
-                return '방문 기록부를 챙겼습니다.'
-            return '이미 방문 기록부를 가지고 있습니다.'
+            return '기록부에 10월 18일 · 2층 갤러리 안내라고 적혀 있어. 어제네… 위층도 찾아봐야겠어.'
         if self.room == 'hall' and hypot(x - 736, y - 330) <= 62:
             return '잠금쇠가 내려가 있어.' if self.door_open else '문 아래 금속 띠가 바닥 쪽으로 이어져 있어.'
         if self.room == 'hall' and hypot(x - 536, y - 330) <= 62:
