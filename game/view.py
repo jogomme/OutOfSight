@@ -13,6 +13,7 @@ from .first_puzzle import COMMON_WALLS, DOOR, DOOR_APPROACH, EXIT, HEIGHT, PLATE
 
 
 ASSETS = Path(__file__).resolve().parent
+OPENING_ART = ASSETS / 'art' / 'opening'
 INK = (236, 222, 190)
 SKIP_BUTTON = (666, 546, 780, 581)
 PORTRAITS = {'동생 · 문자': 'sibling', '자동 안내 음성': 'voicemail', '전화 연결음': 'voicemail'}
@@ -84,7 +85,7 @@ class GameView:
 
     def sound(self, cue):
         if cue not in self.sounds:
-            sound = ASSETS / 'art' / 'opening' / f'{cue}.wav'
+            sound = OPENING_ART / f'{cue}.wav'
             self.sounds[cue] = canvas.load_wav(str(sound))
         return self.sounds[cue]
 
@@ -144,7 +145,7 @@ class GameView:
                 flash = round(235 * max(0, 1 - progress / 0.42))
                 self.draw_fade(flash, (255, 255, 255))
         else:
-            path = folder / f'{background}.png'
+            path = OPENING_ART / f'{background}.png'
             self.image(path).draw(400, 300, WIDTH, HEIGHT)
             if background == 'outside':
                 self.draw_actor(opening.exterior, 'protagonist', 56)
@@ -176,7 +177,7 @@ class GameView:
         canvas.draw_rectangle(23, 15, 777, 166, 165, 130, 92)
         canvas.draw_line(185, 126, 756, 126, 108, 85, 62)
         portrait = PORTRAITS.get(line.speaker, 'hero')
-        self.image(ASSETS / 'art' / 'opening' / f'{portrait}.png').draw(103, 127, 142, 142)
+        self.image(OPENING_ART / f'{portrait}.png').draw(103, 127, 142, 142)
         canvas.draw_rectangle(30, 54, 176, 200, 165, 130, 92)
         self.text(185, 145, line.speaker, 19)
 
