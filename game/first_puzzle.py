@@ -163,6 +163,8 @@ class FirstPuzzle:
 
     @property
     def door_open(self):
+        if self.room == 'hall' and contains(PLATE, self.player.x, self.player.y):
+            return True
         return any(watcher.room == 'hall' and contains(PLATE, watcher.x, watcher.y)
                    for watcher in self.watchers)
 
