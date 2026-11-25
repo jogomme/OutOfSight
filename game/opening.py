@@ -15,7 +15,7 @@ PHONE_ITEM = 'Sibling phone'
 THUNDER_DURATION = 0.30
 THUNDER_LINE = 15
 DOOR_SLAM_LINE = 16
-CUES = {THUNDER_LINE: 'thunder', DOOR_SLAM_LINE: 'door', 17: 'lock', 18: 'footsteps'}
+CUES = {THUNDER_LINE: 'thunder', DOOR_SLAM_LINE: 'door', 17: 'lock'}
 
 
 class Opening:

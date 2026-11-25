@@ -9,7 +9,8 @@ from .dialogue import wrap_text
 from .opening import DOORBELL, DOOR_SLAM_LINE, PHONE, PHONE_ITEM, THUNDER_LINE, WINDOW
 from .lighting import Lighting
 
-from .first_puzzle import COMMON_WALLS, DOOR, DOOR_APPROACH, EXIT, HEIGHT, PLATE, PORTALS, WIDTH
+from .first_puzzle import (COMMON_WALLS, DOOR, DOOR_APPROACH, EXIT, HEIGHT, PLATE,
+                           PORTALS, WARDROBE, WARDROBE_HANDLE, WIDTH)
 
 
 ASSETS = Path(__file__).resolve().parent
@@ -245,6 +246,17 @@ class GameView:
         approach_x, _ = DOOR_APPROACH
         canvas.draw_line(approach_x, door_y - 27, approach_x, door_y + 27, 148, 120, 83)
 
+    @staticmethod
+    def draw_wardrobe(opened):
+        left, bottom, right, top = WARDROBE
+        canvas.draw_rectangle(left, bottom, right, top, 75, 51, 39, filled=True)
+        canvas.draw_rectangle(left + 3, bottom + 5, right - 6, top - 5,
+                              *((36, 25, 26) if opened else (110, 77, 56)), filled=True)
+        if not opened:
+            canvas.draw_line(left, (bottom + top) // 2, right - 6, (bottom + top) // 2, 63, 40, 32)
+            for y in (WARDROBE_HANDLE[1] - 9, WARDROBE_HANDLE[1] + 9):
+                canvas.draw_rectangle(left + 6, y, left + 13, y + 3, 208, 173, 116, filled=True)
+
     def draw_play(self, scene):
         puzzle = scene.puzzle
         if puzzle.room == 'hall':
@@ -253,6 +265,8 @@ class GameView:
             self.draw_plate_and_door(puzzle.door_open)
         else:
             self.image(ASSETS / 'art' / f'{puzzle.room}.png').draw(400, 300, WIDTH, HEIGHT)
+        if puzzle.room == 'dining':
+            self.draw_wardrobe(puzzle.wardrobe_open)
         if puzzle.in_guest_room:
             canvas.draw_rectangle(*EXIT, 97, 163, 112)
             if 'Guest register' not in puzzle.items:
@@ -263,7 +277,7 @@ class GameView:
 
         hidden = []
         for watcher in sorted(puzzle.watchers, key=lambda actor: -actor.y):
-            if watcher.room != puzzle.room:
+            if not watcher.active or watcher.room != puzzle.room:
                 continue
             if puzzle.light_at(watcher.x, watcher.y):
                 self.draw_actor(watcher, 'watcher', 64)
@@ -289,6 +303,8 @@ class GameView:
                 self.text(rect[0], min(rect[1] - 10, 537), label, 14)
         if puzzle.in_guest_room and 'Guest register' not in puzzle.items:
             self.draw_sparkle((422, 336), puzzle.player.animation_time)
+        if puzzle.room == 'dining' and not puzzle.wardrobe_open:
+            self.draw_sparkle(WARDROBE_HANDLE, puzzle.player.animation_time)
         if puzzle.room == 'hall':
             self.draw_sparkle((536, 330), puzzle.player.animation_time)
             self.draw_sparkle((736, 330), puzzle.player.animation_time + 0.32)

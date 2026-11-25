@@ -15,9 +15,11 @@ DOOR_APPROACH = (726, 330)
 DOOR = (744, 288, 768, 372)
 CHASE_DISTANCE = 430
 PATROL_WAIT = 1.2
-WATCHER_STARTS = (('hall', 224, 330), ('dining', 540, 460), ('bath', 350, 430))
+WARDROBE = (660, 386, 768, 478)
+WARDROBE_HANDLE = (660, 432)
+WATCHER_STARTS = (('dining', 746, 432), ('dining', 540, 460), ('bath', 350, 430))
 PATROLS = (
-    (('hall', 224, 330), ('hall', 460, 345)),
+    (('dining', 620, 432), ('hall', 460, 345)),
     (('dining', 540, 460), ('dining', 620, 280), ('kitchen', 570, 200)),
     (('bath', 350, 430), ('bath', 430, 185), ('hall', 620, 151)),
 )
@@ -150,12 +152,17 @@ class FirstPuzzle:
         self.solved = False
         self.flashlight = True
         self.items = []
-        self.activate_room()
+
+    @property
+    def wardrobe_open(self):
+        # The first Watcher's activation is already persisted in the save.
+        return self.watchers[0].active
 
     def activate_room(self):
-        for watcher, (room, _, _) in zip(self.watchers, WATCHER_STARTS):
-            if room == self.room:
-                watcher.active = True
+        if self.solved:
+            for watcher, (room, _, _) in zip(self.watchers[1:], WATCHER_STARTS[1:]):
+                if room == self.room:
+                    watcher.active = True
 
     @property
     def in_guest_room(self):
@@ -165,7 +172,7 @@ class FirstPuzzle:
     def door_open(self):
         if self.room == 'hall' and contains(PLATE, self.player.x, self.player.y):
             return True
-        return any(watcher.room == 'hall' and contains(PLATE, watcher.x, watcher.y)
+        return any(watcher.active and watcher.room == 'hall' and contains(PLATE, watcher.x, watcher.y)
                    for watcher in self.watchers)
 
     @property
@@ -173,6 +180,8 @@ class FirstPuzzle:
         return self.walls_for(self.room)
 
     def walls_for(self, room):
+        if room == 'dining' and not self.wardrobe_open:
+            return (*ROOMS[room], WARDROBE)
         if room != 'hall':
             return ROOMS[room]
         return COMMON_WALLS if self.door_open else (*COMMON_WALLS, DOOR)
@@ -205,6 +214,12 @@ class FirstPuzzle:
 
     def interact(self):
         x, y = self.player.x, self.player.y
+        if (self.room == 'dining' and not self.wardrobe_open
+                and x < WARDROBE_HANDLE[0] and hypot(x - WARDROBE_HANDLE[0], y - WARDROBE_HANDLE[1]) <= 62):
+            watcher = self.watchers[0]
+            watcher.active = True
+            self.player.move(watcher.x - x, watcher.y - y, 0, self.walls)
+            return '안에… 누가 서 있어. 미동도 없어.'
         if self.in_guest_room and hypot(x - 422, y - 336) <= 48:
             if 'Guest register' not in self.items:
                 self.items.append('Guest register')
@@ -219,7 +234,7 @@ class FirstPuzzle:
     def caught(self):
         player = self.player
         return any(
-            watcher.room == self.room
+            watcher.active and watcher.room == self.room
             and abs(player.x - watcher.x) <= player.radius + watcher.radius
             and abs(player.y - watcher.y) <= player.radius + watcher.radius
             for watcher in self.watchers
@@ -322,6 +337,12 @@ class FirstPuzzle:
                 watcher.move(dx, dy, step, walls)
 
         if portal is not None and contains(portal[0], watcher.x, watcher.y):
-            _, watcher.room, arrival, _ = portal
+            _, destination, arrival, _ = portal
+            reach = watcher.radius + self.player.radius
+            if (destination == self.room and abs(arrival[0] - self.player.x) <= reach
+                    and abs(arrival[1] - self.player.y) <= reach):
+                # The arrival point is a shared doorway, so give the player room to step aside.
+                return
+            watcher.room = destination
             watcher.x, watcher.y = arrival
             watcher.route_remaining = 0
