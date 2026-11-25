@@ -49,6 +49,11 @@ class GameView:
     def text(self, x, y, message, size=18):
         self.font(size).draw(x, y, message, INK)
 
+    def text_width(self, message, size):
+        width, height = c_int(), c_int()
+        sdl.TTF_SizeUTF8(self.font(size).font, message.encode('utf-8'), byref(width), byref(height))
+        return width.value
+
     def draw(self, scene):
         if scene.screen == 'opening':
             self.draw_opening(scene.opening)
@@ -62,12 +67,12 @@ class GameView:
             return
 
         backdrop = {
-            'pause': 'settings', 'slots': 'title', 'confirm_slot': 'title',
+            'pause': 'settings', 'slots': 'title', 'confirm_slot': 'title', 'journal': 'inventory',
         }.get(scene.screen, scene.screen)
         self.image(ASSETS / 'art' / f'{backdrop}.png').draw(400, 300, WIDTH, HEIGHT)
         title = {
             'title': 'OUT OF SIGHT', 'pause': '일시 정지',
-            'inventory': '소지품', 'settings': '설정', 'game_over': 'GAME OVER',
+            'inventory': '소지품', 'journal': '조사 기록', 'settings': '설정', 'game_over': 'GAME OVER',
             'slots': '저장 슬롯 선택', 'confirm_slot': '저장 슬롯 확인',
         }[scene.screen]
         if scene.screen == 'game_over':
@@ -78,12 +83,30 @@ class GameView:
             items = ['손전등', *(ITEM_LABELS[item] for item in scene.puzzle.items)]
             for index, item in enumerate(items):
                 self.text(66, 359 - index * 36, item, 22)
+        if scene.screen == 'journal':
+            self.draw_journal(scene)
         for rectangle, label, _ in scene.buttons():
             canvas.draw_rectangle(*rectangle, 23, 27, 32, filled=True)
             canvas.draw_rectangle(*rectangle, 136, 109, 74)
             self.text(rectangle[0] + 13, rectangle[1] + 20, label)
         if scene.message:
             self.text(62, 42, scene.message)
+
+    def draw_journal(self, scene):
+        records = list(reversed(scene.puzzle.journal.values()))
+        canvas.draw_rectangle(62, 165, 738, 408, 23, 27, 32, filled=True)
+        canvas.draw_rectangle(62, 165, 738, 408, 136, 109, 74)
+        if not records:
+            self.text(84, 363, '아직 기록된 조사가 없습니다.', 24)
+            self.text(84, 311, '별장에서 E로 조사한 내용을 여기에 모읍니다.', 20)
+            return
+
+        room, title, message = records[scene.journal_page]
+        self.text(84, 368, f'{ROOM_LABELS[room]} · {title}', 25)
+        self.text(84, 329, f'{scene.journal_page + 1} / {len(records)}', 17)
+        for index, row in enumerate(wrap_text(message, lambda text: self.text_width(text, 22), 630)):
+            self.text(84, 280 - index * 29, row.rstrip(), 22)
+        self.text(62, 51, '왼쪽 / 오른쪽 이동    Esc 소지품    Tab 게임으로', 16)
 
     def sound(self, cue):
         if cue not in self.sounds:
@@ -185,16 +208,12 @@ class GameView:
 
         size = 22
         if self.dialogue_layout is None or self.dialogue_layout[0] != line:
-            self.font(size)
             def measure(text):
-                width, height = c_int(), c_int()
-                sdl.TTF_SizeUTF8(self.fonts[size].font, text.encode('utf-8'), byref(width), byref(height))
-                return width.value
+                return self.text_width(text, size)
 
             rows = wrap_text(line.text, measure, 565)
             while len(rows) > 3 and size > 10:
                 size -= 1
-                self.font(size)
                 rows = wrap_text(line.text, measure, 565)
             self.dialogue_layout = (line, size, rows)
 
@@ -325,7 +344,7 @@ class GameView:
         canvas.draw_rectangle(0, 552, WIDTH, HEIGHT, 17, 19, 23, filled=True)
         self.text(19, 579, ROOM_LABELS[puzzle.room], 20)
         if scene.show_hints:
-            self.text(19, 560, 'WASD 이동   Space+WASD 방향 전환   E 조사   F 손전등   Tab 소지품   Esc 메뉴', 14)
+            self.text(19, 560, 'WASD 이동   Space+WASD 방향 전환   E 조사   F 손전등   Tab 소지품·기록   Esc 메뉴', 14)
         if scene.message:
             canvas.draw_rectangle(0, 0, WIDTH, 32, 17, 19, 23, filled=True)
             self.text(19, 16, scene.message, 16)
@@ -334,7 +353,7 @@ class GameView:
                 if rect == BATH_DOOR and not puzzle.bath_unlocked:
                     label = '공용 욕실 (잠김)'
                 self.text(rect[0], min(rect[1] - 10, 537), label, 14)
-        for point, _ in INSPECTIONS.get(puzzle.room, ()):
+        for point, _, _, _ in INSPECTIONS.get(puzzle.room, ()):
             if (hypot(puzzle.player.x - point[0], puzzle.player.y - point[1]) <= 95
                     and puzzle.light_at(*point)):
                 self.draw_sparkle(point, puzzle.player.animation_time)

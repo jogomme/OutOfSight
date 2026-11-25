@@ -12,7 +12,8 @@ def save_game(path, puzzle, show_hints):
         return [actor.x, actor.y, *actor.facing, actor.animation_time, actor.moving]
 
     data = {
-        'version': 3,
+        'version': 4,
+        'journal': puzzle.journal,
         'bath_unlocked': puzzle.bath_unlocked,
         'room': puzzle.room,
         'player': actor_state(puzzle.player),
@@ -40,7 +41,7 @@ def save_game(path, puzzle, show_hints):
 
 def load_game(path):
     data = json.loads(path.read_text(encoding='utf-8'))
-    if not isinstance(data, dict) or data.get('version') not in (1, 2, 3) or data.get('room') not in PORTALS:
+    if not isinstance(data, dict) or data.get('version') not in (1, 2, 3, 4) or data.get('room') not in PORTALS:
         raise ValueError('Unsupported save file')
 
     puzzle = FirstPuzzle()
@@ -85,11 +86,21 @@ def load_game(path):
             or len(set(items)) != len(items)):
         raise ValueError('Invalid inventory')
     # Versions 1 and 2 allowed the player to enter the bathroom freely.
-    bath_unlocked = data.get('bath_unlocked') if data['version'] == 3 else True
+    bath_unlocked = data.get('bath_unlocked') if data['version'] >= 3 else True
     if type(bath_unlocked) is not bool:
         raise ValueError('Invalid bathroom lock state')
     puzzle.bath_unlocked = bath_unlocked
     puzzle.solved = data['solved']
     puzzle.flashlight = data['flashlight']
     puzzle.items = items
+
+    journal = data.get('journal') if data['version'] >= 4 else {}
+    if not isinstance(journal, dict):
+        raise ValueError('Invalid investigation journal')
+    for key, entry in journal.items():
+        if (not key or not isinstance(entry, list) or len(entry) != 3
+                or not all(isinstance(field, str) and field for field in entry)
+                or entry[0] not in PORTALS):
+            raise ValueError('Invalid investigation entry')
+        puzzle.journal[key] = tuple(entry)
     return puzzle, data['show_hints']

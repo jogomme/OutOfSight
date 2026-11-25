@@ -20,20 +20,21 @@ WARDROBE_HANDLE = (660, 432)
 BATH_DOOR = (586, 55, 660, 84)
 BATH_KEY_POINT = (688, 363)
 BATH_KEY = 'Bathroom key'
+PLATE_OBSERVATION = '내가 발판을 밟자 귀빈실 문이 열렸다.'
 INSPECTIONS = {
     'hall': (
-        ((436, 60), '손잡이를 돌려도 꿈쩍하지 않아. 잠금쇠가 걸린 것 같아.'),
-        ((448, 152), '젖은 발자국이 복도 안쪽으로 이어져. 누군가 빗속에서 들어왔나 봐.'),
+        ((436, 60), 'entrance', '현관 손잡이', '손잡이를 돌려도 꿈쩍하지 않아. 잠금쇠가 걸린 것 같아.'),
+        ((448, 152), 'footprints', '젖은 발자국', '젖은 발자국이 복도 안쪽으로 이어져. 누군가 빗속에서 들어왔나 봐.'),
     ),
     'dining': (
-        ((406, 269), '잔이 여러 개 놓여 있어. 한 자리의 의자만 뒤로 밀려나 있네.'),
+        ((406, 269), 'dining_table', '식탁', '잔이 여러 개 놓여 있어. 한 자리의 의자만 뒤로 밀려나 있네.'),
     ),
     'kitchen': (
-        ((365, 268), '공용 욕실 세면대 물 샘. 수리 전까지 잠가 둘 것. 젖은 열쇠는 안쪽 출입문 옆에 걸어 말릴 것.'),
+        ((365, 268), 'repair_memo', '수리 메모', '공용 욕실 세면대 물 샘. 수리 전까지 잠가 둘 것. 젖은 열쇠는 안쪽 출입문 옆에 걸어 말릴 것.'),
     ),
     'bath': (
-        ((511, 333), '세면대 밑에 놓인 대야에 물이 고여 있어.'),
-        ((258, 400), '지퍼백에 칫솔이랑 치약이 들어 있어. 동생 일행 것일까?'),
+        ((511, 333), 'basin', '물받이', '세면대 밑에 놓인 대야에 물이 고여 있어.'),
+        ((258, 400), 'toiletries', '세면도구', '지퍼백에 칫솔이랑 치약이 들어 있어. 동생 일행 것일까?'),
     ),
 }
 WATCHER_STARTS = (('dining', 746, 432), ('dining', 540, 460), ('bath', 350, 430))
@@ -171,6 +172,7 @@ class FirstPuzzle:
         self.solved = False
         self.flashlight = True
         self.items = []
+        self.journal = {}
         self.bath_unlocked = False
 
     @property
@@ -236,6 +238,10 @@ class FirstPuzzle:
     def observed(self, watcher):
         return watcher.room == self.room and self.light_at(watcher.x, watcher.y) == 2
 
+    def record_inspection(self, key, title, message):
+        self.journal[key] = (self.room, title, message)
+        return message
+
     def interact(self):
         x, y = self.player.x, self.player.y
         if (self.room == 'dining' and not self.wardrobe_open
@@ -243,30 +249,42 @@ class FirstPuzzle:
             watcher = self.watchers[0]
             watcher.active = True
             self.player.move(watcher.x - x, watcher.y - y, 0, self.walls)
-            return '안에… 누가 서 있어. 미동도 없어.'
+            return self.record_inspection('wardrobe', '식당 옷장', '안에… 누가 서 있어. 미동도 없어.')
         if self.in_guest_room and hypot(x - 422, y - 336) <= 48:
             if 'Guest register' not in self.items:
                 self.items.append('Guest register')
-            return '기록부에 10월 18일 · 2층 갤러리 안내라고 적혀 있어. 어제네… 위층도 찾아봐야겠어.'
+            return self.record_inspection(
+                'guest_register', '방문 기록부',
+                '기록부에 10월 18일 · 2층 갤러리 안내라고 적혀 있어. 어제네… 위층도 찾아봐야겠어.',
+            )
         if self.room == 'hall' and hypot(x - 736, y - 330) <= 62:
-            return '잠금쇠가 내려가 있어.' if self.door_open else '문 아래 금속 띠가 바닥 쪽으로 이어져 있어.'
+            message = ('잠금쇠가 내려가 있어.' if self.door_open
+                       else '문 아래 금속 띠가 바닥 쪽으로 이어져 있어.')
+            return self.record_inspection('guest_door', '귀빈실 문', message)
         if self.room == 'hall' and hypot(x - 536, y - 330) <= 62:
-            return '발판 옆 금속 띠가 문틀 아래로 이어져 있어.'
+            message = '발판 옆 금속 띠가 문틀 아래로 이어져 있어.'
+            if self.journal.get('plate', (None, None, None))[2] == PLATE_OBSERVATION:
+                message = PLATE_OBSERVATION
+            return self.record_inspection('plate', '압력 발판', message)
         if self.room == 'hall' and hypot(x - 623, y - 70) <= 54:
+            message = '공용 욕실 문이 잠겨 있어. 직원이 쓰는 열쇠가 어디엔가 있을까?'
             if self.bath_unlocked:
-                return '공용 욕실의 잠금쇠가 풀려 있어.'
-            if BATH_KEY in self.items:
+                message = '공용 욕실의 잠금쇠가 풀려 있어.'
+            elif BATH_KEY in self.items:
                 self.bath_unlocked = True
-                return '열쇠로 공용 욕실 문을 열었다.'
-            return '공용 욕실 문이 잠겨 있어. 직원이 쓰는 열쇠가 어디엔가 있을까?'
+                message = '열쇠로 공용 욕실 문을 열었다.'
+            return self.record_inspection('bath_door', '공용 욕실 문', message)
         if self.room == 'kitchen' and hypot(x - BATH_KEY_POINT[0], y - BATH_KEY_POINT[1]) <= 49:
             if BATH_KEY not in self.items:
                 self.items.append(BATH_KEY)
-                return '고리에 열쇠가 걸려 있어. 표찰에 공용 욕실이라고 쓰여 있다.'
+                return self.record_inspection(
+                    'key_hook', '열쇠 고리', '고리에 열쇠가 걸려 있어. 표찰에 공용 욕실이라고 쓰여 있다.',
+                )
+            self.record_inspection('key_hook', '열쇠 고리', '문 옆 고리에서 공용 욕실 열쇠를 챙겼다.')
             return '열쇠를 챙겼던 빈 고리다.'
-        for point, message in INSPECTIONS.get(self.room, ()):
+        for point, key, title, message in INSPECTIONS.get(self.room, ()):
             if hypot(x - point[0], y - point[1]) <= 43:
-                return message
+                return self.record_inspection(key, title, message)
         return '근처에 조사할 건 없는 것 같아.'
 
     @property
@@ -282,7 +300,10 @@ class FirstPuzzle:
     def update(self, horizontal, vertical, turn_only, dt, transition=None):
         if self.caught:
             return
+        door_was_closed = self.room == 'hall' and not self.door_open
         self.player.move(horizontal, vertical, 0 if turn_only else PLAYER_SPEED * dt, self.walls)
+        if door_was_closed and contains(PLATE, self.player.x, self.player.y):
+            self.record_inspection('plate', '압력 발판', PLATE_OBSERVATION)
 
         self.player.animation_time += dt
         if self.caught:

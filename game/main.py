@@ -39,6 +39,7 @@ class LodgeScene:
         self.opening = None
         self.skip_update = False
         self.thought = None
+        self.journal_page = 0
         self.fade_elapsed = None
         self.fade_action = None
 
@@ -92,6 +93,8 @@ class LodgeScene:
     def finish_opening(self):
         self.puzzle.player.x, self.puzzle.player.y = FIRST_ENCOUNTER
         self.puzzle.player.facing = (1, 0)
+        if PHONE_ITEM in self.puzzle.items:
+            self.puzzle.record_inspection('phone', '동생의 휴대전화', '별장 복도 바닥에서 동생의 휴대전화를 주웠다.')
         self.opening = None
         self.set_screen('play')
         self.skip_update = True
@@ -183,6 +186,14 @@ class LodgeScene:
     def toggle_hints(self):
         self.show_hints = not self.show_hints
 
+    def open_journal(self):
+        self.journal_page = 0
+        self.set_screen('journal')
+
+    def turn_journal_page(self, step):
+        last_page = max(0, len(self.puzzle.journal) - 1)
+        self.journal_page = max(0, min(self.journal_page + step, last_page))
+
     def back(self):
         if self.screen == 'slots':
             self.set_screen('title')
@@ -190,6 +201,8 @@ class LodgeScene:
             self.set_screen('slots')
         elif self.screen == 'settings':
             self.set_screen(self.settings_parent)
+        elif self.screen == 'journal':
+            self.set_screen('inventory')
         elif self.screen in ('pause', 'inventory'):
             self.set_screen('play')
         elif self.screen == 'play':
@@ -226,7 +239,14 @@ class LodgeScene:
             state = '켜짐' if self.show_hints else '꺼짐'
             actions = [(f'조작 안내 · {state}', self.toggle_hints), ('뒤로', self.back)]
         elif self.screen == 'inventory':
-            actions = [('뒤로', self.back)]
+            actions = [('조사 기록  [J]', self.open_journal), ('뒤로', self.back)]
+        elif self.screen == 'journal':
+            controls = [((62, 84, 232, 128), '소지품으로', self.back)]
+            if self.journal_page > 0:
+                controls.append(((430, 84, 574, 128), '이전 기록', lambda: self.turn_journal_page(-1)))
+            if self.journal_page + 1 < len(self.puzzle.journal):
+                controls.append(((594, 84, 738, 128), '다음 기록', lambda: self.turn_journal_page(1)))
+            return controls
         else:
             return []
         if self.screen == 'game_over':
@@ -265,8 +285,15 @@ class LodgeScene:
             self.back()
         elif self.screen == 'title' and event.key == canvas.SDLK_RETURN:
             self.choose_slots('new')
-        elif event.key == canvas.SDLK_TAB and self.screen in ('play', 'inventory'):
+        elif event.key == canvas.SDLK_TAB and self.screen in ('play', 'inventory', 'journal'):
             self.set_screen('inventory' if self.screen == 'play' else 'play')
+        elif self.screen == 'inventory' and event.key == canvas.SDLK_j:
+            self.open_journal()
+        elif self.screen == 'journal':
+            if event.key == canvas.SDLK_LEFT:
+                self.turn_journal_page(-1)
+            elif event.key == canvas.SDLK_RIGHT:
+                self.turn_journal_page(1)
         elif self.screen == 'play':
             if event.key == canvas.SDLK_f:
                 self.puzzle.flashlight = not self.puzzle.flashlight
