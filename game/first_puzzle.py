@@ -17,6 +17,25 @@ CHASE_DISTANCE = 430
 PATROL_WAIT = 1.2
 WARDROBE = (660, 386, 768, 478)
 WARDROBE_HANDLE = (660, 432)
+BATH_DOOR = (586, 55, 660, 84)
+BATH_KEY_POINT = (688, 363)
+BATH_KEY = 'Bathroom key'
+INSPECTIONS = {
+    'hall': (
+        ((436, 60), '손잡이를 돌려도 꿈쩍하지 않아. 잠금쇠가 걸린 것 같아.'),
+        ((448, 152), '젖은 발자국이 복도 안쪽으로 이어져. 누군가 빗속에서 들어왔나 봐.'),
+    ),
+    'dining': (
+        ((406, 269), '잔이 여러 개 놓여 있어. 한 자리의 의자만 뒤로 밀려나 있네.'),
+    ),
+    'kitchen': (
+        ((365, 268), '공용 욕실 세면대 물 샘. 수리 전까지 잠가 둘 것. 젖은 열쇠는 안쪽 출입문 옆에 걸어 말릴 것.'),
+    ),
+    'bath': (
+        ((511, 333), '세면대 밑에 놓인 대야에 물이 고여 있어.'),
+        ((258, 400), '지퍼백에 칫솔이랑 치약이 들어 있어. 동생 일행 것일까?'),
+    ),
+}
 WATCHER_STARTS = (('dining', 746, 432), ('dining', 540, 460), ('bath', 350, 430))
 PATROLS = (
     (('dining', 620, 432), ('hall', 460, 345)),
@@ -55,7 +74,7 @@ PORTALS = {
     'hall': (
         ((235, 524, 321, 556), 'dining', (400, 100), '연회 식당'),
         ((647, 438, 731, 465), 'kitchen', (682, 300), '준비 주방'),
-        ((586, 55, 660, 84), 'bath', (400, 100), '공용 욕실'),
+        (BATH_DOOR, 'bath', (400, 100), '공용 욕실'),
     ),
     'dining': (
         ((358, 43, 442, 75), 'hall', (278, 490), '접객 홀'),
@@ -152,6 +171,7 @@ class FirstPuzzle:
         self.solved = False
         self.flashlight = True
         self.items = []
+        self.bath_unlocked = False
 
     @property
     def wardrobe_open(self):
@@ -189,9 +209,13 @@ class FirstPuzzle:
     def exits(self, room):
         if room == 'guest':
             return (*PORTALS[room], (EXIT, 'hall', (712, 330), '서비스 복도'))
-        if room == 'hall' and self.door_open:
-            return (*PORTALS[room], ((732, 300, 748, 360), 'guest', (88, 330), '귀빈실'))
-        return PORTALS[room]
+        portals = PORTALS[room]
+        if room == 'hall':
+            if not self.bath_unlocked:
+                portals = tuple(link for link in portals if link[1] != 'bath')
+            if self.door_open:
+                portals = (*portals, ((732, 300, 748, 360), 'guest', (88, 330), '귀빈실'))
+        return portals
 
     def light_at(self, x, y, walls=None):
         dx, dy = x - self.player.x, y - self.player.y
@@ -228,6 +252,21 @@ class FirstPuzzle:
             return '잠금쇠가 내려가 있어.' if self.door_open else '문 아래 금속 띠가 바닥 쪽으로 이어져 있어.'
         if self.room == 'hall' and hypot(x - 536, y - 330) <= 62:
             return '발판 옆 금속 띠가 문틀 아래로 이어져 있어.'
+        if self.room == 'hall' and hypot(x - 623, y - 70) <= 54:
+            if self.bath_unlocked:
+                return '공용 욕실의 잠금쇠가 풀려 있어.'
+            if BATH_KEY in self.items:
+                self.bath_unlocked = True
+                return '열쇠로 공용 욕실 문을 열었다.'
+            return '공용 욕실 문이 잠겨 있어. 직원이 쓰는 열쇠가 어디엔가 있을까?'
+        if self.room == 'kitchen' and hypot(x - BATH_KEY_POINT[0], y - BATH_KEY_POINT[1]) <= 49:
+            if BATH_KEY not in self.items:
+                self.items.append(BATH_KEY)
+                return '고리에 열쇠가 걸려 있어. 표찰에 공용 욕실이라고 쓰여 있다.'
+            return '열쇠를 챙겼던 빈 고리다.'
+        for point, message in INSPECTIONS.get(self.room, ()):
+            if hypot(x - point[0], y - point[1]) <= 43:
+                return message
         return '근처에 조사할 건 없는 것 같아.'
 
     @property

@@ -9,8 +9,9 @@ from .dialogue import wrap_text
 from .opening import DOORBELL, DOOR_SLAM_LINE, PHONE, PHONE_ITEM, THUNDER_LINE, WINDOW
 from .lighting import Lighting
 
-from .first_puzzle import (COMMON_WALLS, DOOR, DOOR_APPROACH, EXIT, HEIGHT, PLATE,
-                           PORTALS, WARDROBE, WARDROBE_HANDLE, WIDTH)
+from .first_puzzle import (BATH_DOOR, BATH_KEY, BATH_KEY_POINT, COMMON_WALLS, DOOR,
+                           DOOR_APPROACH, EXIT, HEIGHT, INSPECTIONS, PLATE, PORTALS,
+                           WARDROBE, WARDROBE_HANDLE, WIDTH)
 
 
 ASSETS = Path(__file__).resolve().parent
@@ -18,7 +19,7 @@ OPENING_ART = ASSETS / 'art' / 'opening'
 INK = (236, 222, 190)
 SKIP_BUTTON = (666, 546, 780, 581)
 PORTRAITS = {'동생 · 문자': 'sibling', '자동 안내 음성': 'voicemail', '전화 연결음': 'voicemail'}
-ITEM_LABELS = {'Guest register': '방문 기록부', PHONE_ITEM: '동생의 휴대전화'}
+ITEM_LABELS = {'Guest register': '방문 기록부', PHONE_ITEM: '동생의 휴대전화', BATH_KEY: '공용 욕실 열쇠'}
 ROOM_LABELS = {
     'hall': '별장 1층', 'dining': '연회 식당', 'kitchen': '준비 주방',
     'bath': '공용 욕실', 'guest': '귀빈실', 'upstairs': '별장 2층 · 갤러리',
@@ -253,9 +254,34 @@ class GameView:
         canvas.draw_rectangle(left + 3, bottom + 5, right - 6, top - 5,
                               *((36, 25, 26) if opened else (110, 77, 56)), filled=True)
         if not opened:
-            canvas.draw_line(left, (bottom + top) // 2, right - 6, (bottom + top) // 2, 63, 40, 32)
+            # Put the visible front trim on the lit side of the cabinet's collision edge.
+            canvas.draw_rectangle(left - 5, bottom + 2, left, top - 2, 132, 89, 57, filled=True)
+            canvas.draw_line(left - 5, (bottom + top) // 2, right - 6, (bottom + top) // 2, 63, 40, 32)
             for y in (WARDROBE_HANDLE[1] - 9, WARDROBE_HANDLE[1] + 9):
-                canvas.draw_rectangle(left + 6, y, left + 13, y + 3, 208, 173, 116, filled=True)
+                canvas.draw_rectangle(left - 9, y, left - 3, y + 3, 208, 173, 116, filled=True)
+
+    @staticmethod
+    def draw_investigation_props(puzzle):
+        room = puzzle.room
+        if room == 'hall':
+            for x, y in ((440, 146), (451, 157), (460, 171)):
+                canvas.draw_rectangle(x, y, x + 4, y + 8, 82, 74, 67, filled=True)
+        elif room == 'dining':
+            for x in (383, 402, 421):
+                canvas.draw_rectangle(x, 269, x + 8, 277, 169, 157, 141, filled=True)
+        elif room == 'kitchen':
+            canvas.draw_rectangle(356, 264, 374, 274, 188, 172, 138, filled=True)
+            canvas.draw_line(359, 270, 371, 270, 93, 77, 63)
+            x, y = BATH_KEY_POINT
+            canvas.draw_rectangle(x - 4, y - 4, x + 4, y + 5, 116, 106, 93)
+            if BATH_KEY not in puzzle.items:
+                canvas.draw_line(x, y + 3, x, y - 9, 212, 172, 102)
+                canvas.draw_line(x, y - 9, x + 5, y - 9, 212, 172, 102)
+        elif room == 'bath':
+            canvas.draw_rectangle(496, 326, 526, 340, 119, 150, 154)
+            canvas.draw_rectangle(499, 329, 523, 337, 67, 112, 122, filled=True)
+            canvas.draw_rectangle(248, 395, 268, 405, 171, 164, 149, filled=True)
+            canvas.draw_line(250, 398, 265, 402, 88, 126, 123)
 
     def draw_play(self, scene):
         puzzle = scene.puzzle
@@ -272,8 +298,13 @@ class GameView:
             if 'Guest register' not in puzzle.items:
                 canvas.draw_rectangle(413, 330, 431, 342, 193, 158, 95, filled=True)
 
-        for rectangle, _, _, _ in PORTALS[puzzle.room]:
-            canvas.draw_rectangle(*rectangle, 151, 134, 96)
+        for rectangle, destination, _, _ in PORTALS[puzzle.room]:
+            locked = destination == 'bath' and not puzzle.bath_unlocked
+            canvas.draw_rectangle(*rectangle, *((154, 79, 65) if locked else (151, 134, 96)))
+            if locked:
+                x, y = 623, 70
+                canvas.draw_rectangle(x - 5, y - 4, x + 5, y + 4, 186, 146, 88, filled=True)
+        self.draw_investigation_props(puzzle)
 
         hidden = []
         for watcher in sorted(puzzle.watchers, key=lambda actor: -actor.y):
@@ -300,7 +331,13 @@ class GameView:
             self.text(19, 16, scene.message, 16)
         for rect, _, _, label in PORTALS[puzzle.room]:
             if abs(puzzle.player.x - (rect[0] + rect[2]) / 2) < 75 and abs(puzzle.player.y - (rect[1] + rect[3]) / 2) < 75:
+                if rect == BATH_DOOR and not puzzle.bath_unlocked:
+                    label = '공용 욕실 (잠김)'
                 self.text(rect[0], min(rect[1] - 10, 537), label, 14)
+        for point, _ in INSPECTIONS.get(puzzle.room, ()):
+            if (hypot(puzzle.player.x - point[0], puzzle.player.y - point[1]) <= 95
+                    and puzzle.light_at(*point)):
+                self.draw_sparkle(point, puzzle.player.animation_time)
         if puzzle.in_guest_room and 'Guest register' not in puzzle.items:
             self.draw_sparkle((422, 336), puzzle.player.animation_time)
         if puzzle.room == 'dining' and not puzzle.wardrobe_open:

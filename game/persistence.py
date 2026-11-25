@@ -3,7 +3,7 @@ from math import hypot, isfinite
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from .first_puzzle import FirstPuzzle, HEIGHT, PATROLS, PORTALS, WIDTH
+from .first_puzzle import BATH_KEY, FirstPuzzle, HEIGHT, PATROLS, PORTALS, WIDTH
 from .opening import PHONE_ITEM
 
 
@@ -12,7 +12,8 @@ def save_game(path, puzzle, show_hints):
         return [actor.x, actor.y, *actor.facing, actor.animation_time, actor.moving]
 
     data = {
-        'version': 2,
+        'version': 3,
+        'bath_unlocked': puzzle.bath_unlocked,
         'room': puzzle.room,
         'player': actor_state(puzzle.player),
         'watchers': [actor_state(watcher) for watcher in puzzle.watchers],
@@ -39,7 +40,7 @@ def save_game(path, puzzle, show_hints):
 
 def load_game(path):
     data = json.loads(path.read_text(encoding='utf-8'))
-    if not isinstance(data, dict) or data.get('version') not in (1, 2) or data.get('room') not in PORTALS:
+    if not isinstance(data, dict) or data.get('version') not in (1, 2, 3) or data.get('room') not in PORTALS:
         raise ValueError('Unsupported save file')
 
     puzzle = FirstPuzzle()
@@ -58,7 +59,7 @@ def load_game(path):
             raise ValueError('Invalid animation state')
         actor.x, actor.y, actor.facing, actor.animation_time, actor.moving = x, y, (dx, dy), time, moving
 
-    if data['version'] == 2:
+    if data['version'] >= 2:
         behavior = data['watcher_behavior']
         if len(behavior) != len(puzzle.watchers):
             raise ValueError('Invalid Watcher count')
@@ -80,9 +81,14 @@ def load_game(path):
             raise ValueError('Invalid save option')
     items = data['items']
     if (not isinstance(items, list)
-            or any(item not in ('Guest register', PHONE_ITEM) for item in items)
+            or any(item not in ('Guest register', PHONE_ITEM, BATH_KEY) for item in items)
             or len(set(items)) != len(items)):
         raise ValueError('Invalid inventory')
+    # Versions 1 and 2 allowed the player to enter the bathroom freely.
+    bath_unlocked = data.get('bath_unlocked') if data['version'] == 3 else True
+    if type(bath_unlocked) is not bool:
+        raise ValueError('Invalid bathroom lock state')
+    puzzle.bath_unlocked = bath_unlocked
     puzzle.solved = data['solved']
     puzzle.flashlight = data['flashlight']
     puzzle.items = items
